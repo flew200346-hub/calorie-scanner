@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "516158430088",
+    "project_id": "calorie-scanner-88a54",
+    "storage_bucket": "calorie-scanner-88a54.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:516158430088:android:7c97f981d311261fd9783d",
+        "android_client_info": {
+          "package_name": "com.example.calorie_scanner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtmH7rb6vayFD-tW3Yuan9f_DtJIAK84c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

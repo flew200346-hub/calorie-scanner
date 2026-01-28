@@ -1,0 +1,44 @@
+name: calorie_scanner
+description: A new Flutter project.
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Firebase
+  firebase_core: ^3.4.0
+  firebase_auth: ^5.2.0
+  cloud_firestore: ^5.4.0
+
+  # Image picker
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+  # ✅ สำหรับ App Icon
+  flutter_launcher_icons: ^0.13.1
+
+# ✅ config สำหรับ generate icon
+flutter_icons:
+  android: true
+  ios: true
+  image_path: assets/icon/app_icon.png
+
+flutter:
+  uses-material-design: true
+
+  # ✅ assets ต้องอยู่ใต้ flutter
+  assets:
+    - assets/icon/app_icon.png
