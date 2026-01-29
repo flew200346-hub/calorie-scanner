@@ -29,13 +29,19 @@ class ProfileViewPage extends StatelessWidget {
           )
         ],
       ),
-      body: StreamBuilder(
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: _doc().snapshots(),
         builder: (context, snap) {
-          if (!snap.hasData) {
+          if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final data = snap.data!.data();
+          if (snap.hasError) {
+            return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดโปรไฟล์'));
+          }
+
+          final data = snap.data?.data();
+
+          // ยังไม่มีเอกสารหรือยังไม่มีข้อมูล
           if (data == null || data.isEmpty) {
             return Center(
               child: Column(
@@ -63,37 +69,86 @@ class ProfileViewPage extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // Header card
               Card(
-                child: ListTile(
-                  leading: const Icon(Icons.badge_outlined),
-                  title: Text('${p.firstName} (${p.nickName})'),
-                  subtitle: const Text('ชื่อจริง/ชื่อเล่น'),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 26,
+                        child: Icon(Icons.person, size: 28),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.firstName.isEmpty ? 'ไม่ระบุชื่อ' : p.firstName,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              p.nickName.isEmpty
+                                  ? 'ยังไม่มีชื่อเล่น'
+                                  : 'ชื่อเล่น: ${p.nickName}',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.cake_outlined),
-                  title: Text('${p.age} ปี'),
-                  subtitle: const Text('อายุ'),
-                ),
+              const SizedBox(height: 10),
+
+              _infoTile(
+                icon: Icons.cake_outlined,
+                title: Text('${p.age} ปี'),
+                subtitle: const Text('อายุ'),
               ),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.height),
-                  title: Text('${p.heightCm} cm'),
-                  subtitle: const Text('ส่วนสูง'),
-                ),
+              _infoTile(
+                icon: Icons.height,
+                title: Text('${p.heightCm.toStringAsFixed(0)} cm'),
+                subtitle: const Text('ส่วนสูง'),
               ),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.monitor_weight_outlined),
-                  title: Text('${p.weightKg} kg'),
-                  subtitle: const Text('น้ำหนัก'),
+              _infoTile(
+                icon: Icons.monitor_weight_outlined,
+                title: Text('${p.weightKg.toStringAsFixed(0)} kg'),
+                subtitle: const Text('น้ำหนัก'),
+              ),
+
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileEditPage()),
                 ),
+                icon: const Icon(Icons.edit),
+                label: const Text('แก้ไขโปรไฟล์'),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _infoTile({
+    required IconData icon,
+    required Widget title,
+    required Widget subtitle,
+  }) {
+    return Card(
+      child: ListTile(
+        leading: Icon(icon),
+        title: title, // ✅ ต้องเป็น Widget เช่น Text(...)
+        subtitle: subtitle,
       ),
     );
   }

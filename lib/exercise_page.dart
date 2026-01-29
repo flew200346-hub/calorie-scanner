@@ -1,0 +1,54 @@
+import 'package:flutter/material.dart';
+
+class ExercisePage extends StatefulWidget {
+  const ExercisePage({super.key});
+
+  @override
+  State<ExercisePage> createState() => _ExercisePageState();
+}
+
+class _ExercisePageState extends State<ExercisePage> {
+  final _kcal = TextEditingController(text: '0');
+
+  @override
+  void dispose() {
+    _kcal.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Exercise')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'บันทึกการออกกำลังกาย',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _kcal,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'เผาผลาญ (kcal)',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.local_fire_department_outlined),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: Text('บันทึก (Mock): เผาผลาญ ${_kcal.text} kcal')),
+              );
+            },
+            child: const Text('บันทึก'),
+          ),
+        ],
+      ),
+    );
+  }
+}

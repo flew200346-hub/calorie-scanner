@@ -20,7 +20,29 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Calorie Scanner',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true),
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: const Color(0xFF6C5CE7),
+        scaffoldBackgroundColor: const Color(0xFFF7F4FB),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: false,
+          surfaceTintColor: Colors.transparent,
+          titleTextStyle: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
       home: const AuthGate(),
     );
   }
@@ -38,8 +60,10 @@ class AuthGate extends StatelessWidget {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
+
         final user = snap.data;
         if (user == null) return const LoginPage();
         return const AppShell();
