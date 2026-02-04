@@ -27,19 +27,25 @@ dev_dependencies:
 
   flutter_lints: ^5.0.0
 
-  # ✅ สำหรับ App Icon
+  # App Icon generator
   flutter_launcher_icons: ^0.13.1
 
-# ✅ config สำหรับ generate icon
-flutter_icons:
+# ====== CONFIG: flutter_launcher_icons ======
+flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/icon/app_icon.png
+
+  # ใช้รูปเดียวเป็นหลัก (ต้องเป็น PNG)
+  image_path: "assets/icon/icon3.png"
+
+  # ทำให้ Android adaptive icon ดูเต็มขึ้น (พื้นหลัง + foreground)
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/icon3.png"
+
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
 
-  # ✅ assets ต้องอยู่ใต้ flutter
   assets:
-    - assets/icon/app_icon.png
-cloud_firestore: ^5.4.0
+    - assets/icon/icon3.png
