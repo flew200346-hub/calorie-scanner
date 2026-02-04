@@ -15,13 +15,15 @@ class ProfileViewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
           IconButton(
             tooltip: 'แก้ไข',
-            icon: const Icon(Icons.edit),
+            icon: const Icon(Icons.edit_outlined),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ProfileEditPage()),
@@ -44,22 +46,43 @@ class ProfileViewPage extends StatelessWidget {
           // ยังไม่มีเอกสารหรือยังไม่มีข้อมูล
           if (data == null || data.isEmpty) {
             return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.person_outline, size: 72),
-                  const SizedBox(height: 8),
-                  const Text('ยังไม่มีข้อมูลโปรไฟล์'),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const ProfileEditPage()),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 34,
+                      backgroundColor: cs.primary.withValues(alpha: 0.12),
+                      child: Icon(
+                        Icons.person_outline,
+                        size: 36,
+                        color: cs.primary,
+                      ),
                     ),
-                    child: const Text('สร้างโปรไฟล์'),
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    const Text(
+                      'ยังไม่มีข้อมูลโปรไฟล์',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'กดเพื่อสร้างโปรไฟล์สำหรับคำนวณ/บันทึกข้อมูล',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ProfileEditPage()),
+                      ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('สร้างโปรไฟล์'),
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -69,17 +92,22 @@ class ProfileViewPage extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Header card
+              // Header card (ปรับให้ดูแพงขึ้น + ใช้สีธีม)
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(18),
                   child: Row(
                     children: [
-                      const CircleAvatar(
-                        radius: 26,
-                        child: Icon(Icons.person, size: 28),
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: cs.primary.withValues(alpha: 0.12),
+                        child: Icon(
+                          Icons.person,
+                          size: 30,
+                          color: cs.primary,
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,15 +116,18 @@ class ProfileViewPage extends StatelessWidget {
                               p.firstName.isEmpty ? 'ไม่ระบุชื่อ' : p.firstName,
                               style: const TextStyle(
                                 fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
                             Text(
                               p.nickName.isEmpty
                                   ? 'ยังไม่มีชื่อเล่น'
                                   : 'ชื่อเล่น: ${p.nickName}',
-                              style: TextStyle(color: Colors.grey[600]),
+                              style: TextStyle(
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
@@ -105,25 +136,29 @@ class ProfileViewPage extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
               _infoTile(
+                context,
                 icon: Icons.cake_outlined,
                 title: Text('${p.age} ปี'),
                 subtitle: const Text('อายุ'),
               ),
               _infoTile(
+                context,
                 icon: Icons.height,
                 title: Text('${p.heightCm.toStringAsFixed(0)} cm'),
                 subtitle: const Text('ส่วนสูง'),
               ),
               _infoTile(
+                context,
                 icon: Icons.monitor_weight_outlined,
                 title: Text('${p.weightKg.toStringAsFixed(0)} kg'),
                 subtitle: const Text('น้ำหนัก'),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
+
               FilledButton.icon(
                 onPressed: () => Navigator.push(
                   context,
@@ -139,16 +174,29 @@ class ProfileViewPage extends StatelessWidget {
     );
   }
 
-  Widget _infoTile({
+  Widget _infoTile(
+    BuildContext context, {
     required IconData icon,
     required Widget title,
     required Widget subtitle,
   }) {
+    final cs = Theme.of(context).colorScheme;
+
     return Card(
       child: ListTile(
-        leading: Icon(icon),
-        title: title, // ✅ ต้องเป็น Widget เช่น Text(...)
-        subtitle: subtitle,
+        leading: CircleAvatar(
+          radius: 18,
+          backgroundColor: cs.primary.withValues(alpha: 0.10),
+          child: Icon(icon, color: cs.primary, size: 20),
+        ),
+        title: DefaultTextStyle.merge(
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+          child: title,
+        ),
+        subtitle: DefaultTextStyle.merge(
+          style: TextStyle(color: cs.onSurfaceVariant),
+          child: subtitle,
+        ),
       ),
     );
   }

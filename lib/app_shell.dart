@@ -16,24 +16,72 @@ class _AppShellState extends State<AppShell> {
 
   final _pages = const [
     HomePage(),
-    ScanPage(), // ✅ ไม่ต้องส่ง mealKey/dayId แล้ว
+    ScanPage(),
     ProfileViewPage(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: _pages[_index],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(
-              icon: Icon(Icons.qr_code_scanner), label: 'Scan'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline), label: 'Profile'),
-        ],
+
+      // ✅ ทำให้บาร์โทนเดียวกับแอป (สวยขึ้นและสม่ำเสมอ)
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 18,
+              offset: const Offset(0, -8),
+              color: Colors.black.withValues(alpha: 0.06),
+            ),
+          ],
+        ),
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            height: 70,
+            backgroundColor: Colors.white,
+            indicatorColor: cs.primary.withValues(alpha: 0.12),
+            labelTextStyle: WidgetStateProperty.resolveWith((states) {
+              final selected = states.contains(WidgetState.selected);
+              return TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                color: selected ? cs.primary : cs.onSurfaceVariant,
+              );
+            }),
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              final selected = states.contains(WidgetState.selected);
+              return IconThemeData(
+                size: 24,
+                color: selected ? cs.primary : cs.onSurfaceVariant,
+              );
+            }),
+          ),
+          child: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: (i) => setState(() => _index = i),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home_rounded),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.qr_code_scanner),
+                selectedIcon: Icon(Icons.qr_code_scanner),
+                label: 'Scan',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Profile',
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -74,50 +74,22 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  InputDecoration _fieldDeco({
-    required String label,
-    required IconData icon,
-    Widget? suffixIcon,
-  }) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon),
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.black12),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(
-          color: Colors.green.shade400,
-          width: 1.4,
-        ),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: Stack(
         children: [
-          // Background gradient
+          // ✅ Background gradient โทนเดียวกับแอป
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.green.shade200.withOpacity(0.35),
-                  Colors.white,
+                  cs.primary.withValues(alpha: 0.16),
+                  Theme.of(context).scaffoldBackgroundColor,
                 ],
               ),
             ),
@@ -131,7 +103,7 @@ class _LoginPageState extends State<LoginPage> {
                   constraints: const BoxConstraints(maxWidth: 420),
                   child: Column(
                     children: [
-                      // Logo badge
+                      // ✅ Logo badge โทนเดียว
                       Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
@@ -152,13 +124,13 @@ class _LoginPageState extends State<LoginPage> {
                               width: 52,
                               height: 52,
                               decoration: BoxDecoration(
-                                color: Colors.green.shade50,
+                                color: cs.primary.withValues(alpha: 0.10),
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.local_fire_department,
-                                size: 32,
-                                color: Colors.green,
+                                size: 30,
+                                color: cs.primary,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -189,14 +161,8 @@ class _LoginPageState extends State<LoginPage> {
 
                       const SizedBox(height: 16),
 
-                      // Card
+                      // ✅ Card ใช้ Theme (ไม่ติดเขียว)
                       Card(
-                        elevation: 0,
-                        color: Colors.white.withOpacity(0.95),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          side: const BorderSide(color: Colors.black12),
-                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(18),
                           child: Column(
@@ -206,37 +172,37 @@ class _LoginPageState extends State<LoginPage> {
                                 'ยินดีต้อนรับกลับมา 👋',
                                 style: TextStyle(
                                   fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              const Text(
+                              Text(
                                 'กรอกอีเมลและรหัสผ่านเพื่อเข้าสู่ระบบ',
-                                style: TextStyle(color: Colors.black54),
+                                style: TextStyle(color: cs.onSurfaceVariant),
                               ),
                               const SizedBox(height: 18),
 
-                              // Email
+                              // ✅ Email: ใช้ InputDecorationTheme จาก main.dart
                               TextField(
                                 controller: _email,
                                 keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.next,
-                                decoration: _fieldDeco(
-                                  label: 'Email',
-                                  icon: Icons.email_outlined,
+                                decoration: const InputDecoration(
+                                  labelText: 'Email',
+                                  prefixIcon: Icon(Icons.email_outlined),
                                 ),
                               ),
                               const SizedBox(height: 12),
 
-                              // Password
+                              // ✅ Password
                               TextField(
                                 controller: _password,
                                 obscureText: _obscure,
                                 textInputAction: TextInputAction.done,
                                 onSubmitted: (_) => _loading ? null : _login(),
-                                decoration: _fieldDeco(
-                                  label: 'Password',
-                                  icon: Icons.lock_outline,
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  prefixIcon: const Icon(Icons.lock_outline),
                                   suffixIcon: IconButton(
                                     onPressed: () =>
                                         setState(() => _obscure = !_obscure),
@@ -249,7 +215,6 @@ class _LoginPageState extends State<LoginPage> {
 
                               const SizedBox(height: 10),
 
-                              // Forgot password (placeholder)
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: TextButton(
@@ -260,16 +225,10 @@ class _LoginPageState extends State<LoginPage> {
 
                               const SizedBox(height: 6),
 
-                              // Login button
+                              // ✅ Login button: ไม่กำหนดสีเอง ให้ใช้ theme
                               SizedBox(
                                 height: 50,
                                 child: FilledButton(
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
                                   onPressed: _loading ? null : _login,
                                   child: _loading
                                       ? const SizedBox(
@@ -284,7 +243,7 @@ class _LoginPageState extends State<LoginPage> {
                                           'Login',
                                           style: TextStyle(
                                             fontSize: 16,
-                                            fontWeight: FontWeight.w600,
+                                            fontWeight: FontWeight.w800,
                                           ),
                                         ),
                                 ),
@@ -292,15 +251,10 @@ class _LoginPageState extends State<LoginPage> {
 
                               const SizedBox(height: 12),
 
-                              // Create account
+                              // ✅ Create account: ใช้ outlined theme
                               SizedBox(
                                 height: 48,
                                 child: OutlinedButton(
-                                  style: OutlinedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
                                   onPressed: _loading
                                       ? null
                                       : () => Navigator.push(
