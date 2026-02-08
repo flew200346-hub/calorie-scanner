@@ -10,6 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  tflite_flutter: ^0.10.4
+  image: ^4.2.0
+  http: ^1.1.0
+  google_generative_ai: ^0.4.6
 
   cupertino_icons: ^1.0.8
 
@@ -49,3 +53,5 @@ flutter:
 
   assets:
     - assets/icon/icon3.png
+    - assets/best_float32.tflite
+    - assets/labels.txt
