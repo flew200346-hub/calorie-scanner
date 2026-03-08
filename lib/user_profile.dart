@@ -15,7 +15,7 @@ class UserProfile {
     required this.weightKg,
   });
 
-  // ===== helper parse กันชน =====
+  // Helper parse กันชน
   static int _toInt(dynamic v, {int def = 0}) {
     if (v == null) return def;
     if (v is int) return v;

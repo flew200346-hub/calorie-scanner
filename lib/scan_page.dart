@@ -1,12 +1,70 @@
-import 'dart:typed_data';
 import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
-import 'package:calorie_scanner/food_result_page.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 
+import 'food_result_page.dart';
+
+// ---------------------------------------------------------------------------
+// ชื่ออาหารไทย 37 รายการ (key ตรงกับ labels.txt)
+// ---------------------------------------------------------------------------
+const Map<String, String> _thaiNames = {
+  'BBQ-Pork-Rice': 'ข้าวหมูแดง',
+  'Bitter-Melon-Soup': 'ต้มจืดมะระ',
+  'Chicken-Biryani': 'ข้าวหมกไก่',
+  'Chicken-Rice': 'ข้าวมันไก่',
+  'Curried-Fish-Cake': 'ทอดมันปลา',
+  'Dipping-sauce': 'น้ำจิ้ม',
+  'Dumpling': 'ขนมจีบ',
+  'Eggs-Stewed': 'ไข่พะโล้',
+  'Fried-Chicken': 'ไก่ทอด',
+  'Fried-Egg': 'ไข่ดาว',
+  'Fried-Noodle-in-Gravy-Sauce': 'ราดหน้า',
+  'Fried-Oysters': 'หอยทอด',
+  'Fried-Rice-with-Shrimp-Paste': 'ข้าวคลุกกะปิ',
+  'Green-Curry': 'แกงเขียวหวาน',
+  'Grill-Shrimp': 'กุ้งเผา',
+  'Grilled-Pork-Neck': 'คอหมูย่าง',
+  'Kai-look-khei': 'ไข่ลูกเขย',
+  'Kai-Yang': 'ไก่ย่าง',
+  'Kua-Jab-Nam-Khon': 'ก๋วยจั๊บน้ำข้น',
+  'Massaman-Curry': 'แกงมัสมั่น',
+  'Omelet': 'ไข่เจียว',
+  'Pad-Kaprao': 'ผัดกะเพรา',
+  'Pad-Thai': 'ผัดไทย',
+  'Papaya-Salad': 'ส้มตำไทย',
+  'Poo-Pad-Pongali': 'ปูผัดผงกะหรี่',
+  'Pork Satay': 'หมูสะเต๊ะ',
+  'Pork-porridge': 'โจ๊กหมู',
+  'Pork-with-Garlic': 'หมูกระเทียม',
+  'Roast-fish': 'ปลาเผา',
+  'Spicy-Mincing-Pork-Salad': 'ลาบหมู',
+  'Stewed-Pork-Leg-Rice': 'ข้าวขาหมู',
+  'Stir-fried-Kale-with-Crispy-Pork': 'คะน้าหมูกรอบ',
+  'Stir-fried-Morning-Glory': 'ผัดผักบุ้งไฟแดง',
+  'Stir-fried-Noodles-in-Soy-Sauce': 'ผัดซีอิ๊ว',
+  'Thai-clear-soup': 'ต้มจืด',
+  'Thai-Noodles-with-Pork-and-Blood-Soup': 'ก๋วยเตี๋ยวเรือหมูน้ำตก',
+  'Yum-Woon-Sen': 'ยำวุ้นเส้น',
+};
+
+// ---------------------------------------------------------------------------
+// สีประจำมื้อ
+// ---------------------------------------------------------------------------
+const Map<String, Color> _mealColors = {
+  'มื้อเช้า': Color(0xFFFFC107),
+  'มื้อเที่ยง': Color(0xFF4CAF50),
+  'มื้อเย็น': Color(0xFF3F51B5),
+  'มื้อทานเล่น': Color(0xFFE91E63),
+};
+
+// ===========================================================================
+// ScanPage
+// ===========================================================================
 class ScanPage extends StatefulWidget {
   final String initialMeal;
   final String? initialFoodName;
@@ -22,26 +80,24 @@ class ScanPage extends StatefulWidget {
 }
 
 class _ScanPageState extends State<ScanPage> {
+  // --- State ---
   final _picker = ImagePicker();
-  Uint8List? _bytes;
-  String? _imagePath; 
+  final _foodNameCtrl = TextEditingController();
+
+  Uint8List? _imageBytes;
+  String? _imagePath;
   late String _meal;
   bool _isModelLoaded = false;
 
-  Interpreter? _interpreter; 
+  // --- TFLite ---
+  Interpreter? _interpreter;
   List<String>? _labels;
+  List<int>? _outputShape;
+  int _inputSize = 640;
 
-  final TextEditingController _foodNameCtrl = TextEditingController();
-
-  final Map<String, Color> _mealColors = const {
-    'มื้อเช้า': Color(0xFFFFC107),
-    'มื้อเที่ยง': Color(0xFF4CAF50),
-    'มื้อเย็น': Color(0xFF3F51B5),
-    'มื้อทานเล่น': Color(0xFFE91E63),
-  };
-
-  Color _colorOf(String meal) => _mealColors[meal] ?? Colors.blueGrey;
-
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
   @override
   void initState() {
     super.initState();
@@ -49,29 +105,53 @@ class _ScanPageState extends State<ScanPage> {
     _loadModel();
 
     final initName = (widget.initialFoodName ?? '').trim();
-    if (initName.isNotEmpty) {
-      _foodNameCtrl.text = initName;
-    }
+    if (initName.isNotEmpty) _foodNameCtrl.text = initName;
   }
 
-  // ✅ ฟังก์ชันโหลดโมเดล (ปรับปรุงให้รองรับการเช็ค Dimension)
+  @override
+  void dispose() {
+    _foodNameCtrl.dispose();
+    _interpreter?.close();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // โหลดโมเดล + labels
+  // ---------------------------------------------------------------------------
   Future<void> _loadModel() async {
     try {
-      _interpreter = await Interpreter.fromAsset("assets/best_float32.tflite");
-      
+      _interpreter = await Interpreter.fromAsset('assets/best_float32.tflite');
+
       final labelsData = await rootBundle.loadString('assets/labels.txt');
       _labels = labelsData.split('\n').where((s) => s.isNotEmpty).toList();
 
-      debugPrint("Model Loaded: Input ${_interpreter!.getInputTensor(0).shape}");
-      debugPrint("Model Loaded: Output ${_interpreter!.getOutputTensor(0).shape}");
+      _outputShape = _interpreter!.getOutputTensor(0).shape;
+      final inputShape = _interpreter!.getInputTensor(0).shape;
+      _inputSize = inputShape[1];
 
+      debugPrint('Model loaded — input: $inputShape, output: $_outputShape');
       setState(() => _isModelLoaded = true);
     } catch (e) {
-      debugPrint("Error loading model: $e");
+      debugPrint('Error loading model: $e');
     }
   }
 
-  // ✅ ฟังก์ชันวิเคราะห์รูปภาพ (แก้ไข Logic AI ทั้งหมดตามที่คุยกัน)
+  // ---------------------------------------------------------------------------
+  // เลือก / ถ่ายรูป
+  // ---------------------------------------------------------------------------
+  Future<void> _pickImage(ImageSource source) async {
+    final file = await _picker.pickImage(source: source, imageQuality: 85);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    setState(() {
+      _imageBytes = bytes;
+      _imagePath = file.path;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // วิเคราะห์รูปด้วย YOLOv8
+  // ---------------------------------------------------------------------------
   Future<void> _analyzeImage() async {
     if (_imagePath == null || !_isModelLoaded) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,109 +160,34 @@ class _ScanPageState extends State<ScanPage> {
       return;
     }
 
+    // แสดง loading
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
-      // 1. Preprocessing: Resize เป็น 640x640 เพื่อแก้ Error Dimensions Mismatch
-      final imageData = File(_imagePath!).readAsBytesSync();
-      img.Image? image = img.decodeImage(imageData);
-      img.Image resizedImage = img.copyResize(image!, width: 640, height: 640);
-
-      // 2. แปลงภาพเป็น Float32 [1, 640, 640, 3] และ Normalize (0.0 - 1.0)
-      var input = List.generate(1, (index) => 
-        List.generate(640, (y) => 
-          List.generate(640, (x) {
-            final pixel = resizedImage.getPixel(x, y);
-            return [
-              pixel.r / 255.0,
-              pixel.g / 255.0,
-              pixel.b / 255.0,
-            ];
-          }),
-        ),
-      );
-
-      // 3. เตรียมที่ว่างสำหรับ Output [1, 16, 8400]
-      var output = List.filled(1 * 16 * 8400, 0.0).reshape([1, 16, 8400]);
-
-      // 4. รัน AI
-      _interpreter!.run(input, output);
-
-      // 5. Post-processing: วนลูป 8400 ครั้ง เพื่อหาค่าความมั่นใจสูงสุด
-      double maxConfidence = 0;
-      int bestClassIdx = -1;
-
-      for (int i = 0; i < 8400; i++) {
-        // บางโมเดล YOLOv8 ค่า Confidence จะไม่ได้แยกออกมา 
-        // แต่จะใช้ค่าสูงสุดจาก Class Scores (แถวที่ 4 ถึง 15) ไปเลย
-        double currentMaxScore = 0;
-        int currentClass = -1;
-
-        for (int c = 4; c < 16; c++) { // ตรวจสอบแถวที่ 4 ถึง 15
-          double score = output[0][c][i];
-          if (score > currentMaxScore) {
-            currentMaxScore = score;
-            currentClass = c - 4; // ปรับ Index ให้ตรงกับ Labels
-          }
-        }
-
-        // ถ้าเจอค่าที่สูงกว่าเดิม ให้บันทึกไว้
-        if (currentMaxScore > maxConfidence) {
-          maxConfidence = currentMaxScore;
-          bestClassIdx = currentClass; 
-        }
-      }
-
-      print("DEBUG: Final Max Confidence: $maxConfidence");
-      print("DEBUG: Best Class Index: $bestClassIdx");
-
+      final result = _runInference();
       if (!mounted) return;
-      Navigator.pop(context); // ปิด Loading
+      Navigator.pop(context); // ปิด loading
 
-      if (bestClassIdx != -1 && maxConfidence > 0.25) {
-        String englishName = _labels![bestClassIdx].trim();
-        
-        Map<String, String> thaiNames = {
-          'BBQ Pork Rice': 'ข้าวหมูแดง',
-          'Chicken Rice': 'ข้าวมันไก่',
-          'Fried Egg': 'ไข่ดาว',
-          'Fried Noodle in Gravy Sauce': 'ราดหน้า',
-          'Omelet Rice': 'ข้าวไข่เจียว',
-          'Pad_Kaprao': 'ผัดกะเพรา',
-          'Papaya Salad': 'ส้มตำ',
-          'Pork-with-Garlic': 'หมูกระเทียม',
-          'Stewed Pork Leg Rice': 'ข้าวขาหมู',
-          'Stir-fried Noodles in Soy Sauce': 'ผัดซีอิ๊ว',
-          'Stir-fried-Kale-with-Crispy-Pork': 'คะน้าหมูกรอบ',
-          'Thai Stir-fried Noodle': 'ผัดไทย',
-        };
+      if (result != null) {
+        final englishName = result.$1;
+        final confidence = result.$2;
+        final thaiDisplay = _thaiNames[englishName] ?? englishName;
 
-        String thaiDisplay = thaiNames[englishName] ?? englishName;
-
-        setState(() {
-          _foodNameCtrl.text = thaiDisplay;
-        });
+        _foodNameCtrl.text = thaiDisplay;
 
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => FoodResultPage(
-              foodName: englishName, // ส่งชื่ออังกฤษไปถาม API [cite: 30]
+            builder: (_) => FoodResultPage(
+              foodName: englishName,
               thaiName: thaiDisplay,
-              confidence: maxConfidence,
+              confidence: confidence,
+              mealType: _meal,
             ),
-          ),
-        );
-      
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('วิเคราะห์เป็น: ${_foodNameCtrl.text} (${(maxConfidence * 100).toStringAsFixed(0)}%)'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
           ),
         );
       } else {
@@ -191,49 +196,77 @@ class _ScanPageState extends State<ScanPage> {
         );
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
-      debugPrint("Analysis Error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
-      );
+      debugPrint('Analysis Error: $e');
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
-  Future<void> _pickImageFromGallery() async {
-    final x = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-    if (x == null) return;
-    final b = await x.readAsBytes();
-    setState(() {
-      _bytes = b;
-      _imagePath = x.path;
-    });
+  /// รัน inference แล้ว return (className, confidence) หรือ null ถ้าไม่มั่นใจ
+  (String, double)? _runInference() {
+    // 1. อ่านและ resize รูป
+    final imageData = File(_imagePath!).readAsBytesSync();
+    final decoded = img.decodeImage(imageData)!;
+    final resized = img.copyResize(decoded, width: _inputSize, height: _inputSize);
+
+    // 2. แปลงเป็น Float32 [1, H, W, 3] — normalize 0‑1
+    final input = List.generate(
+      1,
+      (_) => List.generate(
+        _inputSize,
+        (y) => List.generate(_inputSize, (x) {
+          final px = resized.getPixel(x, y);
+          return [px.r / 255.0, px.g / 255.0, px.b / 255.0];
+        }),
+      ),
+    );
+
+    // 3. เตรียม output buffer
+    final rows = _outputShape![1];
+    final cols = _outputShape![2];
+    final output = List.filled(1 * rows * cols, 0.0).reshape([1, rows, cols]);
+
+    // 4. รัน model
+    _interpreter!.run(input, output);
+
+    // 5. หา class ที่มั่นใจสูงสุด (เฉพาะ class ที่อยู่ใน labels)
+    double maxConf = 0;
+    int bestIdx = -1;
+    final maxC = 4 + _labels!.length;
+
+    for (int i = 0; i < cols; i++) {
+      for (int c = 4; c < maxC && c < rows; c++) {
+        final score = output[0][c][i] as double;
+        if (score > maxConf) {
+          maxConf = score;
+          bestIdx = c - 4;
+        }
+      }
+    }
+
+    debugPrint('Inference result — class: $bestIdx, confidence: $maxConf');
+
+    if (bestIdx == -1 || maxConf <= 0.25) return null;
+    return (_labels![bestIdx].trim(), maxConf);
   }
 
-  Future<void> _takePhoto() async {
-    final x = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
-    if (x == null) return;
-    final b = await x.readAsBytes();
-    setState(() {
-      _bytes = b;
-      _imagePath = x.path;
-    });
-  }
-
-  @override
-  void dispose() {
-    _foodNameCtrl.dispose();
-    _interpreter?.close(); 
-    super.dispose();
-  }
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+  Color _colorOf(String meal) => _mealColors[meal] ?? Colors.blueGrey;
 
   @override
   Widget build(BuildContext context) {
-    final mealColor = _colorOf(_meal);
+    final color = _colorOf(_meal);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Scan with AI'),
-        backgroundColor: mealColor.withOpacity(0.08),
+        backgroundColor: color.withOpacity(0.08),
         elevation: 0,
       ),
       body: Container(
@@ -241,7 +274,7 @@ class _ScanPageState extends State<ScanPage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [mealColor.withOpacity(0.14), Colors.white],
+            colors: [color.withOpacity(0.14), Colors.white],
           ),
         ),
         child: ListView(
@@ -254,123 +287,121 @@ class _ScanPageState extends State<ScanPage> {
             ),
             const SizedBox(height: 16),
 
-            // --- Dropdown เลือกมื้อ ---
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: mealColor.withOpacity(0.25)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _meal,
-                  items: const [
-                    DropdownMenuItem(value: 'มื้อเช้า', child: Text('มื้อเช้า')),
-                    DropdownMenuItem(value: 'มื้อเที่ยง', child: Text('มื้อเที่ยง')),
-                    DropdownMenuItem(value: 'มื้อเย็น', child: Text('มื้อเย็น')),
-                    DropdownMenuItem(value: 'มื้อทานเล่น', child: Text('มื้อทานเล่น')),
-                  ],
-                  onChanged: (v) => setState(() => _meal = v ?? _meal),
-                  decoration: InputDecoration(
-                    labelText: 'เลือกมื้อ',
-                    prefixIcon: Icon(Icons.restaurant_menu, color: mealColor),
-                    border: const OutlineInputBorder(),
-                  ),
+            // เลือกมื้อ
+            _buildCard(
+              color,
+              DropdownButtonFormField<String>(
+                initialValue: _meal,
+                items: const [
+                  DropdownMenuItem(value: 'มื้อเช้า', child: Text('มื้อเช้า')),
+                  DropdownMenuItem(value: 'มื้อเที่ยง', child: Text('มื้อเที่ยง')),
+                  DropdownMenuItem(value: 'มื้อเย็น', child: Text('มื้อเย็น')),
+                  DropdownMenuItem(value: 'มื้อทานเล่น', child: Text('มื้อทานเล่น')),
+                ],
+                onChanged: (v) => setState(() => _meal = v ?? _meal),
+                decoration: InputDecoration(
+                  labelText: 'เลือกมื้อ',
+                  prefixIcon: Icon(Icons.restaurant_menu, color: color),
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ),
-
             const SizedBox(height: 12),
 
-            // --- TextField ชื่ออาหาร ---
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: mealColor.withOpacity(0.25)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: TextField(
-                  controller: _foodNameCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'ชื่ออาหาร (AI จะเติมให้)',
-                    prefixIcon: Icon(Icons.fastfood_outlined, color: mealColor),
-                    border: const OutlineInputBorder(),
-                  ),
+            // ชื่ออาหาร
+            _buildCard(
+              color,
+              TextField(
+                controller: _foodNameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'ชื่ออาหาร (AI จะเติมให้)',
+                  prefixIcon: Icon(Icons.fastfood_outlined, color: color),
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ),
-
             const SizedBox(height: 12),
 
-            // --- ส่วนแสดงรูปภาพ ---
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-                side: BorderSide(color: mealColor.withOpacity(0.25)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: AspectRatio(
-                  aspectRatio: 1.3,
-                  child: _bytes == null
-                      ? const Center(child: Text('ยังไม่มีรูป\nกดถ่ายรูปเพื่อเริ่มสแกน'))
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.memory(_bytes!, fit: BoxFit.cover),
-                        ),
-                ),
+            // รูปภาพ
+            _buildCard(
+              color,
+              AspectRatio(
+                aspectRatio: 1.3,
+                child: _imageBytes == null
+                    ? const Center(child: Text('ยังไม่มีรูป\nกดถ่ายรูปเพื่อเริ่มสแกน'))
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.memory(_imageBytes!, fit: BoxFit.cover),
+                      ),
               ),
             ),
-
             const SizedBox(height: 20),
 
-            // --- ปุ่มกดถ่ายรูป ---
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: mealColor,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: _takePhoto,
-              icon: const Icon(Icons.camera_alt_outlined),
-              label: const Text('ถ่ายรูปอาหาร'),
+            // ปุ่มถ่ายรูป
+            _actionButton(
+              color: color,
+              icon: Icons.camera_alt_outlined,
+              label: 'ถ่ายรูปอาหาร',
+              onPressed: () => _pickImage(ImageSource.camera),
             ),
-            
             const SizedBox(height: 12),
 
-            // --- ปุ่มสั่ง AI วิเคราะห์ ---
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.black87,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
+            // ปุ่มวิเคราะห์
+            _actionButton(
+              color: Colors.black87,
+              icon: Icons.auto_awesome,
+              label: _isModelLoaded ? 'เริ่มวิเคราะห์ด้วย AI' : 'กำลังโหลดโมเดล...',
               onPressed: _analyzeImage,
-              icon: const Icon(Icons.auto_awesome),
-              label: Text(_isModelLoaded ? 'เริ่มวิเคราะห์ด้วย AI' : 'กำลังโหลดโมเดล...'),
             ),
-
             const SizedBox(height: 12),
 
+            // ปุ่มเลือกจากคลัง
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: mealColor,
-                side: BorderSide(color: mealColor, width: 1.6),
+                foregroundColor: color,
+                side: BorderSide(color: color, width: 1.6),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              onPressed: _pickImageFromGallery,
+              onPressed: () => _pickImage(ImageSource.gallery),
               icon: const Icon(Icons.photo_library_outlined),
               label: const Text('เลือกรูปจากคลัง'),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Widget helpers
+  // ---------------------------------------------------------------------------
+  Widget _buildCard(Color borderColor, Widget child) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: borderColor.withOpacity(0.25)),
+      ),
+      child: Padding(padding: const EdgeInsets.all(12), child: child),
+    );
+  }
+
+  Widget _actionButton({
+    required Color color,
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return FilledButton.icon(
+      style: FilledButton.styleFrom(
+        backgroundColor: color,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      onPressed: onPressed,
+      icon: Icon(icon),
+      label: Text(label),
     );
   }
 }

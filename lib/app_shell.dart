@@ -26,8 +26,6 @@ class _AppShellState extends State<AppShell> {
 
     return Scaffold(
       body: _pages[_index],
-
-      // ✅ ทำให้บาร์โทนเดียวกับแอป (สวยขึ้นและสม่ำเสมอ)
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.white,

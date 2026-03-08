@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../user_profile.dart';
+import 'user_profile.dart';
 
 class ProfileEditPage extends StatefulWidget {
   const ProfileEditPage({super.key});
