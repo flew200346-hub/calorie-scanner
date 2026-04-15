@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
-// ---------------------------------------------------------------------------
-// สีประจำมื้อ
-// ---------------------------------------------------------------------------
+import 'widgets/cosmic_background.dart';
+import 'widgets/frosted_card.dart';
+import 'widgets/hover_scale.dart';
+
 const Map<String, Color> _mealColors = {
   'มื้อเช้า': Color(0xFFFFC107),
   'มื้อเที่ยง': Color(0xFF4CAF50),
@@ -17,6 +18,11 @@ class FoodResultPage extends StatefulWidget {
   final String thaiName;
   final double confidence;
   final String mealType;
+  final double calories;
+  final double protein;
+  final double fat;
+  final double carbs;
+  final String servingSize;
 
   const FoodResultPage({
     super.key,
@@ -24,6 +30,11 @@ class FoodResultPage extends StatefulWidget {
     required this.thaiName,
     required this.confidence,
     this.mealType = 'มื้อเที่ยง',
+    required this.calories,
+    required this.protein,
+    required this.fat,
+    required this.carbs,
+    this.servingSize = '1 จาน',
   });
 
   @override
@@ -31,283 +42,348 @@ class FoodResultPage extends StatefulWidget {
 }
 
 class _FoodResultPageState extends State<FoodResultPage> {
-  late Future<Map<String, dynamic>?> _nutritionFuture;
   bool _saved = false;
   bool _saving = false;
 
-  Color get _accentColor => _mealColors[widget.mealType] ?? const Color(0xFF4CAF50);
+  Color get _accentColor =>
+      _mealColors[widget.mealType] ?? const Color(0xFF4CAF50);
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
-  @override
-  void initState() {
-    super.initState();
-    _nutritionFuture = _fetchNutrition();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Data
-  // ---------------------------------------------------------------------------
-  Future<Map<String, dynamic>?> _fetchNutrition() async {
-    final localData = <String, Map<String, dynamic>>{
-      'BBQ-Pork-Rice': {'calories': 540, 'protein_g': 18, 'fat_total_g': 15, 'carbohydrates_total_g': 82},
-      'Bitter-Melon-Soup': {'calories': 85, 'protein_g': 6, 'fat_total_g': 2, 'carbohydrates_total_g': 10},
-      'Chicken-Biryani': {'calories': 630, 'protein_g': 28, 'fat_total_g': 22, 'carbohydrates_total_g': 78},
-      'Chicken-Rice': {'calories': 596, 'protein_g': 24, 'fat_total_g': 28, 'carbohydrates_total_g': 62},
-      'Curried-Fish-Cake': {'calories': 270, 'protein_g': 14, 'fat_total_g': 16, 'carbohydrates_total_g': 18},
-      'Dipping-sauce': {'calories': 45, 'protein_g': 1, 'fat_total_g': 1, 'carbohydrates_total_g': 9},
-      'Dumpling': {'calories': 260, 'protein_g': 12, 'fat_total_g': 10, 'carbohydrates_total_g': 30},
-      'Eggs-Stewed': {'calories': 180, 'protein_g': 12, 'fat_total_g': 12, 'carbohydrates_total_g': 6},
-      'Fried-Chicken': {'calories': 480, 'protein_g': 32, 'fat_total_g': 28, 'carbohydrates_total_g': 22},
-      'Fried-Egg': {'calories': 117, 'protein_g': 7, 'fat_total_g': 9, 'carbohydrates_total_g': 1},
-      'Fried-Noodle-in-Gravy-Sauce': {'calories': 405, 'protein_g': 15, 'fat_total_g': 12, 'carbohydrates_total_g': 60},
-      'Fried-Oysters': {'calories': 350, 'protein_g': 12, 'fat_total_g': 20, 'carbohydrates_total_g': 30},
-      'Fried-Rice-with-Shrimp-Paste': {'calories': 520, 'protein_g': 16, 'fat_total_g': 22, 'carbohydrates_total_g': 65},
-      'Green-Curry': {'calories': 480, 'protein_g': 20, 'fat_total_g': 28, 'carbohydrates_total_g': 38},
-      'Grill-Shrimp': {'calories': 220, 'protein_g': 30, 'fat_total_g': 8, 'carbohydrates_total_g': 4},
-      'Grilled-Pork-Neck': {'calories': 390, 'protein_g': 28, 'fat_total_g': 28, 'carbohydrates_total_g': 5},
-      'Kai-look-khei': {'calories': 320, 'protein_g': 14, 'fat_total_g': 22, 'carbohydrates_total_g': 18},
-      'Kai-Yang': {'calories': 350, 'protein_g': 35, 'fat_total_g': 18, 'carbohydrates_total_g': 8},
-      'Kua-Jab-Nam-Khon': {'calories': 450, 'protein_g': 18, 'fat_total_g': 20, 'carbohydrates_total_g': 50},
-      'Massaman-Curry': {'calories': 550, 'protein_g': 22, 'fat_total_g': 30, 'carbohydrates_total_g': 48},
-      'Omelet': {'calories': 445, 'protein_g': 12, 'fat_total_g': 28, 'carbohydrates_total_g': 35},
-      'Pad-Kaprao': {'calories': 550, 'protein_g': 22, 'fat_total_g': 25, 'carbohydrates_total_g': 58},
-      'Pad-Thai': {'calories': 485, 'protein_g': 14, 'fat_total_g': 15, 'carbohydrates_total_g': 75},
-      'Papaya-Salad': {'calories': 120, 'protein_g': 5, 'fat_total_g': 2, 'carbohydrates_total_g': 21},
-      'Poo-Pad-Pongali': {'calories': 380, 'protein_g': 20, 'fat_total_g': 22, 'carbohydrates_total_g': 25},
-      'Pork Satay': {'calories': 340, 'protein_g': 24, 'fat_total_g': 20, 'carbohydrates_total_g': 16},
-      'Pork-porridge': {'calories': 280, 'protein_g': 15, 'fat_total_g': 8, 'carbohydrates_total_g': 38},
-      'Pork-with-Garlic': {'calories': 520, 'protein_g': 25, 'fat_total_g': 30, 'carbohydrates_total_g': 38},
-      'Roast-fish': {'calories': 300, 'protein_g': 35, 'fat_total_g': 14, 'carbohydrates_total_g': 5},
-      'Spicy-Mincing-Pork-Salad': {'calories': 250, 'protein_g': 20, 'fat_total_g': 15, 'carbohydrates_total_g': 10},
-      'Stewed-Pork-Leg-Rice': {'calories': 650, 'protein_g': 20, 'fat_total_g': 35, 'carbohydrates_total_g': 65},
-      'Stir-fried-Kale-with-Crispy-Pork': {'calories': 620, 'protein_g': 18, 'fat_total_g': 38, 'carbohydrates_total_g': 52},
-      'Stir-fried-Morning-Glory': {'calories': 150, 'protein_g': 5, 'fat_total_g': 8, 'carbohydrates_total_g': 14},
-      'Stir-fried-Noodles-in-Soy-Sauce': {'calories': 520, 'protein_g': 14, 'fat_total_g': 24, 'carbohydrates_total_g': 62},
-      'Thai-clear-soup': {'calories': 100, 'protein_g': 8, 'fat_total_g': 3, 'carbohydrates_total_g': 8},
-      'Thai-Noodles-with-Pork-and-Blood-Soup': {'calories': 420, 'protein_g': 22, 'fat_total_g': 15, 'carbohydrates_total_g': 50},
-      'Yum-Woon-Sen': {'calories': 200, 'protein_g': 10, 'fat_total_g': 6, 'carbohydrates_total_g': 28},
-    };
-
-    return localData[widget.foodName];
-  }
-
-  Future<void> _saveMeal(Map<String, dynamic> nutrients) async {
+  Future<void> _saveMeal() async {
     setState(() => _saving = true);
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      debugPrint('Save failed: user not logged in');
-      setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+        _showDialog(
+          icon: const Icon(Icons.error_outline, color: Colors.red, size: 48),
+          title: 'บันทึกไม่สำเร็จ',
+          content: 'ไม่พบผู้ใช้ที่ล็อกอินอยู่',
+        );
+      }
       return;
     }
 
     try {
-      // เขียนลง local cache ทันที ไม่ต้องรอ server
-      FirebaseFirestore.instance.collection('meals').add({
+      await FirebaseFirestore.instance.collection('meals').add({
         'uid': uid,
         'foodName': widget.thaiName,
         'mealType': widget.mealType,
-        'calories': nutrients['calories'] ?? 0,
-        'protein_g': nutrients['protein_g'] ?? 0,
-        'fat_total_g': nutrients['fat_total_g'] ?? 0,
-        'carbohydrates_total_g': nutrients['carbohydrates_total_g'] ?? 0,
+        'calories': widget.calories,
+        'protein_g': widget.protein,
+        'fat_total_g': widget.fat,
+        'carbohydrates_total_g': widget.carbs,
         'confidence': widget.confidence,
-        'createdAt': FieldValue.serverTimestamp(),
+        'servingSize': widget.servingSize,
+        'createdAt': Timestamp.now(),
       });
 
-      debugPrint('Save success!');
       if (mounted) {
-        setState(() { _saved = true; _saving = false; });
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
-            title: const Text('บันทึกสำเร็จ'),
-            content: Text('บันทึก "${widget.thaiName}" เรียบร้อยแล้ว'),
-            actions: [
-              FilledButton(onPressed: () => Navigator.pop(context), child: const Text('ตกลง')),
-            ],
-          ),
+        setState(() {
+          _saved = true;
+          _saving = false;
+        });
+        _showDialog(
+          icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
+          title: 'บันทึกสำเร็จ',
+          content: 'บันทึก "${widget.thaiName}" เรียบร้อยแล้ว',
         );
       }
     } catch (e) {
-      debugPrint('Save error: $e');
       if (mounted) {
         setState(() => _saving = false);
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            icon: const Icon(Icons.error_outline, color: Colors.red, size: 48),
-            title: const Text('บันทึกไม่สำเร็จ'),
-            content: Text('$e'),
-            actions: [
-              FilledButton(onPressed: () => Navigator.pop(context), child: const Text('ตกลง')),
-            ],
-          ),
+        _showDialog(
+          icon: const Icon(Icons.error_outline, color: Colors.red, size: 48),
+          title: 'บันทึกไม่สำเร็จ',
+          content: '$e',
         );
       }
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------------
+  void _showDialog({
+    required Widget icon,
+    required String title,
+    required String content,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        icon: icon,
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ตกลง'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: cs.surface,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(widget.thaiName),
-        backgroundColor: _accentColor.withOpacity(0.08),
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [_accentColor.withOpacity(0.12), cs.surface],
-          ),
-        ),
-        child: FutureBuilder<Map<String, dynamic>?>(
-          future: _nutritionFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            final nutrients = snapshot.data;
-            final cal = nutrients?['calories'] ?? 0;
-            final protein = nutrients?['protein_g'] ?? 0;
-            final fat = nutrients?['fat_total_g'] ?? 0;
-            final carb = nutrients?['carbohydrates_total_g'] ?? 0;
-
-            return ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              children: [
-                const SizedBox(height: 8),
-
-                // ชื่ออาหาร + confidence
-                Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        widget.thaiName,
-                        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+      body: CosmicBackground(
+        useSafeArea: true,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            _buildPageTitle(),
+            const SizedBox(height: 16),
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    widget.thaiName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _accentColor.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: _accentColor.withOpacity(0.28),
                       ),
-                      const SizedBox(height: 4),
-                      Chip(
-                        avatar: Icon(Icons.auto_awesome, size: 16, color: _accentColor),
-                        label: Text(
-                          'ความมั่นใจ ${(widget.confidence * 100).toStringAsFixed(1)}%',
-                          style: TextStyle(color: _accentColor, fontWeight: FontWeight.w600),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 18,
+                          color: _accentColor,
                         ),
-                        backgroundColor: _accentColor.withOpacity(0.10),
-                        side: BorderSide.none,
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Text(
+                          'ความมั่นใจ ${(widget.confidence * 100).toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            color: _accentColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Center(child: _buildCalorieCircle(widget.calories)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _macroCard(
+                    'Protein',
+                    widget.protein,
+                    'g',
+                    Colors.redAccent,
+                    Icons.fitness_center,
                   ),
                 ),
-
-                const SizedBox(height: 24),
-
-                // วงแคลอรี่
-                Center(child: _buildCalorieCircle(cal)),
-
-                const SizedBox(height: 28),
-
-                // Macro cards
-                Row(
-                  children: [
-                    Expanded(child: _macroCard('Protein', protein, 'g', Colors.redAccent, Icons.fitness_center)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _macroCard('Fat', fat, 'g', Colors.orange, Icons.water_drop)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _macroCard('Carbs', carb, 'g', Colors.blueAccent, Icons.grain)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _macroCard(
+                    'Fat',
+                    widget.fat,
+                    'g',
+                    Colors.orange,
+                    Icons.water_drop,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _macroCard(
+                    'Carbs',
+                    widget.carbs,
+                    'g',
+                    Colors.blueAccent,
+                    Icons.grain,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            FrostedCard(
+              borderRadius: BorderRadius.circular(20),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: _accentColor.withOpacity(0.15),
+                  child: Icon(Icons.restaurant, color: _accentColor),
+                ),
+                title: Text(
+                  widget.mealType,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text('ปริมาณ: ${widget.servingSize}'),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FrostedCard(
+              borderRadius: BorderRadius.circular(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'สรุปโภชนาการ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _nutritionRow(
+                      'พลังงาน', '${widget.calories.toStringAsFixed(0)} kcal'),
+                  _nutritionRow(
+                      'โปรตีน', '${widget.protein.toStringAsFixed(0)} g'),
+                  _nutritionRow('ไขมัน', '${widget.fat.toStringAsFixed(0)} g'),
+                  _nutritionRow(
+                      'คาร์โบไฮเดรต', '${widget.carbs.toStringAsFixed(0)} g'),
+                  _nutritionRow(
+                    'ความมั่นใจ',
+                    '${(widget.confidence * 100).toStringAsFixed(1)}%',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            HoverScale(
+              borderRadius: BorderRadius.circular(18),
+              onTap: (_saved || _saving) ? null : _saveMeal,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: _saved
+                        ? const [Colors.green, Colors.green]
+                        : const [Color(0xFF7C5CFF), Color(0xFF5E8BFF)],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_saved ? Colors.green : const Color(0xFF7C5CFF))
+                          .withOpacity(0.30),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
                   ],
                 ),
-
-                const SizedBox(height: 20),
-
-                // มื้ออาหาร
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: BorderSide(color: _accentColor.withOpacity(0.25)),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: _accentColor.withOpacity(0.15),
-                      child: Icon(Icons.restaurant, color: _accentColor),
-                    ),
-                    title: Text(widget.mealType, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: const Text('ประเภทมื้ออาหาร'),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // ปุ่มบันทึก
-                if (nutrients != null)
-                  FilledButton.icon(
+                child: SizedBox(
+                  height: 54,
+                  child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                      backgroundColor: _saved ? Colors.green : _accentColor,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
                     ),
-                    onPressed: (_saved || _saving) ? null : () => _saveMeal(nutrients),
+                    onPressed: (_saved || _saving) ? null : _saveMeal,
                     icon: _saving
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : Icon(_saved ? Icons.check : Icons.save),
-                    label: Text(_saving ? 'กำลังบันทึก...' : (_saved ? 'บันทึกแล้ว' : 'บันทึกมื้ออาหาร')),
+                    label: Text(
+                      _saving
+                          ? 'กำลังบันทึก...'
+                          : (_saved ? 'บันทึกแล้ว' : 'บันทึกมื้ออาหาร'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-
-                const SizedBox(height: 12),
-
-                // ปุ่มกลับ
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _accentColor,
-                    side: BorderSide(color: _accentColor, width: 1.6),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('กลับสู่หน้าสแกน'),
                 ),
-
-                const SizedBox(height: 20),
-              ],
-            );
-          },
+              ),
+            ),
+            const SizedBox(height: 12),
+            HoverScale(
+              borderRadius: BorderRadius.circular(18),
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _accentColor,
+                  side: BorderSide(color: _accentColor, width: 1.6),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('กลับสู่หน้าสแกน'),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Widget helpers
-  // ---------------------------------------------------------------------------
-  Widget _buildCalorieCircle(dynamic cal) {
+  Widget _buildPageTitle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ผลลัพธ์การวิเคราะห์',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'ตรวจสอบข้อมูลก่อนบันทึกมื้ออาหาร',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.78),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCalorieCircle(double cal) {
     return Container(
-      width: 160,
-      height: 160,
+      width: 178,
+      height: 178,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
-          colors: [_accentColor.withOpacity(0.15), _accentColor.withOpacity(0.04)],
+          colors: [
+            _accentColor.withOpacity(0.18),
+            _accentColor.withOpacity(0.05),
+          ],
         ),
         border: Border.all(color: _accentColor, width: 5),
         boxShadow: [
           BoxShadow(
-            color: _accentColor.withOpacity(0.20),
-            blurRadius: 20,
+            color: _accentColor.withOpacity(0.22),
+            blurRadius: 24,
             spreadRadius: 2,
           ),
         ],
@@ -316,44 +392,80 @@ class _FoodResultPageState extends State<FoodResultPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            '$cal',
+            cal.toStringAsFixed(0),
             style: TextStyle(
-              fontSize: 38,
+              fontSize: 42,
               fontWeight: FontWeight.w900,
               color: _accentColor,
             ),
           ),
-          Text('kcal', style: TextStyle(fontSize: 14, color: _accentColor.withOpacity(0.7))),
+          Text(
+            'kcal',
+            style: TextStyle(
+              fontSize: 14,
+              color: _accentColor.withOpacity(0.75),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _macroCard(String label, dynamic value, String unit, Color color, IconData icon) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: color.withOpacity(0.25)),
+  Widget _macroCard(
+    String label,
+    double value,
+    String unit,
+    Color color,
+    IconData icon,
+  ) {
+    return FrostedCard(
+      borderRadius: BorderRadius.circular(18),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${value.toStringAsFixed(0)}$unit',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: Colors.grey[300]),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        child: Column(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: color.withOpacity(0.12),
-              child: Icon(icon, color: color, size: 20),
+    );
+  }
+
+  Widget _nutritionRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey[300]),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '$value$unit',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

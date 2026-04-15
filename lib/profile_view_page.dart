@@ -2,8 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import 'user_profile.dart';
 import 'profile_edit_page.dart';
+import 'user_profile.dart';
+import 'widgets/cosmic_background.dart';
+import 'widgets/frosted_card.dart';
+import 'widgets/hover_scale.dart';
 
 class ProfileViewPage extends StatefulWidget {
   const ProfileViewPage({super.key});
@@ -21,7 +24,8 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
   void initState() {
     super.initState();
     _uid = FirebaseAuth.instance.currentUser!.uid;
-    _profileStream = FirebaseFirestore.instance.collection('users').doc(_uid).snapshots();
+    _profileStream =
+        FirebaseFirestore.instance.collection('users').doc(_uid).snapshots();
     _historyStream = FirebaseFirestore.instance
         .collection('meals')
         .where('uid', isEqualTo: _uid)
@@ -31,7 +35,10 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
   }
 
   void _goEdit() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileEditPage()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ProfileEditPage()),
+    );
   }
 
   Future<void> _confirmLogout() async {
@@ -41,12 +48,21 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
         title: const Text('ออกจากระบบ'),
         content: const Text('คุณต้องการออกจากระบบใช่ไหม?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('ออกจากระบบ')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ออกจากระบบ'),
+          ),
         ],
       ),
     );
-    if (ok == true) await FirebaseAuth.instance.signOut();
+
+    if (ok == true) {
+      await FirebaseAuth.instance.signOut();
+    }
   }
 
   Future<void> _confirmDeleteHistory() async {
@@ -56,7 +72,10 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
         title: const Text('ลบประวัติทั้งหมด'),
         content: const Text('ข้อมูลมื้ออาหารทั้งหมดจะถูกลบ ดำเนินการต่อ?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
@@ -65,6 +84,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
         ],
       ),
     );
+
     if (ok != true) return;
 
     final batch = FirebaseFirestore.instance.batch();
@@ -72,202 +92,388 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
         .collection('meals')
         .where('uid', isEqualTo: _uid)
         .get();
+
     for (final doc in docs.docs) {
       batch.delete(doc.reference);
     }
+
     await batch.commit();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ลบประวัติทั้งหมดแล้ว'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('ลบประวัติทั้งหมดแล้ว'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Profile'),
+        centerTitle: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
-          IconButton(tooltip: 'แก้ไข', icon: const Icon(Icons.edit_outlined), onPressed: _goEdit),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: HoverScale(
+              borderRadius: BorderRadius.circular(999),
+              onTap: _goEdit,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  tooltip: 'แก้ไข',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: _goEdit,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: _profileStream,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดโปรไฟล์'));
-          }
+      body: CosmicBackground(
+        useSafeArea: true,
+        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: _profileStream,
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final data = snap.data?.data();
-          if (data == null || data.isEmpty) return _buildEmptyState(cs);
+            if (snap.hasError) {
+              return const Center(
+                child: Text(
+                  'เกิดข้อผิดพลาดในการโหลดโปรไฟล์',
+                  style: TextStyle(color: Colors.white),
+                ),
+              );
+            }
 
-          return _buildFullPage(cs, UserProfile.fromMap(data));
-        },
+            final data = snap.data?.data();
+            if (data == null || data.isEmpty) {
+              return _buildEmptyState(cs);
+            }
+
+            return _buildFullPage(cs, UserProfile.fromMap(data));
+          },
+        ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // ยังไม่มีโปรไฟล์
-  // ---------------------------------------------------------------------------
   Widget _buildEmptyState(ColorScheme cs) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 34,
-              backgroundColor: cs.primary.withValues(alpha: 0.12),
-              child: Icon(Icons.person_outline, size: 36, color: cs.primary),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: FrostedCard(
+            borderRadius: BorderRadius.circular(28),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  radius: 34,
+                  backgroundColor: cs.primary.withOpacity(0.12),
+                  child: Icon(
+                    Icons.person_outline,
+                    size: 36,
+                    color: cs.primary,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'ยังไม่มีข้อมูลโปรไฟล์',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'สร้างโปรไฟล์เพื่อให้แอปคำนวณและบันทึกข้อมูลได้ดีขึ้น',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                HoverScale(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: _goEdit,
+                  child: FilledButton.icon(
+                    onPressed: _goEdit,
+                    icon: const Icon(Icons.add),
+                    label: const Text('สร้างโปรไฟล์'),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            const Text('ยังไม่มีข้อมูลโปรไฟล์', style: TextStyle(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 6),
-            Text(
-              'กดเพื่อสร้างโปรไฟล์สำหรับคำนวณ/บันทึกข้อมูล',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: _goEdit,
-              icon: const Icon(Icons.add),
-              label: const Text('สร้างโปรไฟล์'),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // หน้าเต็ม: โปรไฟล์ + ประวัติ + ตั้งค่า
-  // ---------------------------------------------------------------------------
   Widget _buildFullPage(ColorScheme cs, UserProfile p) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        // ===== ข้อมูลส่วนตัว =====
+        _buildPageTitle(),
+        const SizedBox(height: 16),
         _buildProfileHeader(cs, p),
-        const SizedBox(height: 8),
-        _infoTile(cs, icon: Icons.cake_outlined, title: '${p.age} ปี', subtitle: 'อายุ'),
-        _infoTile(cs, icon: Icons.height, title: '${p.heightCm.toStringAsFixed(0)} cm', subtitle: 'ส่วนสูง'),
-        _infoTile(cs, icon: Icons.monitor_weight_outlined, title: '${p.weightKg.toStringAsFixed(0)} kg', subtitle: 'น้ำหนัก'),
-        const SizedBox(height: 10),
-        FilledButton.icon(onPressed: _goEdit, icon: const Icon(Icons.edit), label: const Text('แก้ไขโปรไฟล์')),
-
+        const SizedBox(height: 16),
+        _buildInfoGrid(cs, p),
         const SizedBox(height: 24),
-
-        // ===== ประวัติมื้ออาหาร =====
         _buildHistorySection(cs),
-
         const SizedBox(height: 24),
-
-        // ===== ตั้งค่า =====
         _buildSettingsSection(cs),
-
-        const SizedBox(height: 20),
       ],
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Profile header
-  // ---------------------------------------------------------------------------
+  Widget _buildPageTitle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'โปรไฟล์ของฉัน',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'ดูข้อมูลสุขภาพและจัดการบัญชีของคุณ',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.78),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildProfileHeader(ColorScheme cs, UserProfile p) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: cs.primary.withValues(alpha: 0.12),
-              child: Text(
-                p.nickName.isNotEmpty ? p.nickName[0].toUpperCase() : (p.firstName.isNotEmpty ? p.firstName[0].toUpperCase() : '?'),
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: cs.primary),
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final displayLetter = p.nickName.isNotEmpty
+        ? p.nickName[0].toUpperCase()
+        : (p.firstName.isNotEmpty ? p.firstName[0].toUpperCase() : '?');
+
+    return FrostedCard(
+      borderRadius: BorderRadius.circular(28),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 34,
+            backgroundColor: cs.primary.withOpacity(0.12),
+            child: Text(
+              displayLetter,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: cs.primary,
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p.firstName.isEmpty ? 'ไม่ระบุชื่อ' : p.firstName,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.firstName.isEmpty ? 'ไม่ระบุชื่อ' : p.firstName,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    p.nickName.isEmpty ? 'ยังไม่มีชื่อเล่น' : 'ชื่อเล่น: ${p.nickName}',
-                    style: TextStyle(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  p.nickName.isEmpty
+                      ? 'ยังไม่มีชื่อเล่น'
+                      : 'ชื่อเล่น: ${p.nickName}',
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    FirebaseAuth.instance.currentUser?.email ?? '',
-                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  email,
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 12,
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoGrid(ColorScheme cs, UserProfile p) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ข้อมูลสุขภาพ',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 1.28,
+          children: [
+            _statCard(
+              cs,
+              icon: Icons.cake_outlined,
+              title: '${p.age}',
+              subtitle: 'อายุ (ปี)',
+            ),
+            _statCard(
+              cs,
+              icon: Icons.height,
+              title: p.heightCm.toStringAsFixed(0),
+              subtitle: 'ส่วนสูง (cm)',
+            ),
+            _statCard(
+              cs,
+              icon: Icons.monitor_weight_outlined,
+              title: p.weightKg.toStringAsFixed(0),
+              subtitle: 'น้ำหนัก (kg)',
+            ),
+            _statCard(
+              cs,
+              icon: Icons.edit_note_rounded,
+              title: 'จัดการ',
+              subtitle: 'แก้ไขโปรไฟล์',
+              onTap: _goEdit,
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _statCard(
+    ColorScheme cs, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onTap,
+  }) {
+    return HoverScale(
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: FrostedCard(
+        borderRadius: BorderRadius.circular(22),
+        padding: const EdgeInsets.all(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: cs.primary.withOpacity(0.12),
+                child: Icon(icon, size: 18, color: cs.primary),
+              ),
+              const Spacer(),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: cs.onSurfaceVariant,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // ประวัติมื้ออาหาร
-  // ---------------------------------------------------------------------------
   Widget _buildHistorySection(ColorScheme cs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.history, size: 20, color: cs.primary),
-            const SizedBox(width: 6),
-            const Text('ประวัติมื้ออาหาร', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          ],
+        const Text(
+          'ประวัติมื้ออาหาร',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _historyStream,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Card(child: SizedBox(height: 80, child: Center(child: CircularProgressIndicator())));
+              return const FrostedCard(
+                child: SizedBox(
+                  height: 120,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
             }
 
             final docs = snap.data?.docs ?? [];
             if (docs.isEmpty) {
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Center(
-                    child: Text('ยังไม่มีประวัติ', style: TextStyle(color: cs.onSurfaceVariant)),
+              return FrostedCard(
+                borderRadius: BorderRadius.circular(24),
+                padding: const EdgeInsets.all(22),
+                child: Center(
+                  child: Text(
+                    'ยังไม่มีประวัติการบันทึก',
+                    style: TextStyle(color: cs.onSurfaceVariant),
                   ),
                 ),
               );
             }
 
-            return Card(
+            return FrostedCard(
+              borderRadius: BorderRadius.circular(24),
+              padding: EdgeInsets.zero,
               child: Column(
                 children: [
                   for (int i = 0; i < docs.length; i++) ...[
                     _historyTile(cs, docs[i].data()),
-                    if (i < docs.length - 1) const Divider(height: 1, indent: 56, endIndent: 14),
+                    if (i < docs.length - 1)
+                      const Divider(height: 1, indent: 64, endIndent: 16),
                   ],
                 ],
               ),
@@ -281,12 +487,15 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
   Widget _historyTile(ColorScheme cs, Map<String, dynamic> data) {
     final name = (data['foodName'] ?? '-').toString();
     final mealType = (data['mealType'] ?? '').toString();
-    final cal = (data['calories'] is num) ? (data['calories'] as num).round() : 0;
+    final cal =
+        (data['calories'] is num) ? (data['calories'] as num).round() : 0;
+
     final ts = data['createdAt'];
     String dateStr = '';
     if (ts is Timestamp) {
       final d = ts.toDate();
-      dateStr = '${d.day}/${d.month}/${d.year} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+      dateStr =
+          '${d.day}/${d.month}/${d.year} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
     }
 
     const mealIcons = {
@@ -296,35 +505,57 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
       'มื้อทานเล่น': Icons.cake_outlined,
     };
 
-    return ListTile(
-      dense: true,
-      leading: CircleAvatar(
-        radius: 16,
-        backgroundColor: cs.primary.withValues(alpha: 0.10),
-        child: Icon(mealIcons[mealType] ?? Icons.restaurant, size: 18, color: cs.primary),
+    return HoverScale(
+      borderRadius: BorderRadius.circular(18),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: CircleAvatar(
+          radius: 18,
+          backgroundColor: cs.primary.withOpacity(0.10),
+          child: Icon(
+            mealIcons[mealType] ?? Icons.restaurant,
+            size: 18,
+            color: cs.primary,
+          ),
+        ),
+        title: Text(
+          name,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          '$mealType  •  $cal kcal',
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        trailing: Text(
+          dateStr,
+          style: TextStyle(
+            fontSize: 11,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
       ),
-      title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text('$mealType  •  $cal kcal', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-      trailing: Text(dateStr, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // ตั้งค่า
-  // ---------------------------------------------------------------------------
   Widget _buildSettingsSection(ColorScheme cs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.settings, size: 20, color: cs.primary),
-            const SizedBox(width: 6),
-            const Text('ตั้งค่า', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          ],
+        const Text(
+          'ตั้งค่า',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
         ),
-        const SizedBox(height: 10),
-        Card(
+        const SizedBox(height: 12),
+        FrostedCard(
+          borderRadius: BorderRadius.circular(24),
+          padding: EdgeInsets.zero,
           child: Column(
             children: [
               _settingsTile(
@@ -333,7 +564,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                 title: 'แก้ไขโปรไฟล์',
                 onTap: _goEdit,
               ),
-              const Divider(height: 1, indent: 56, endIndent: 14),
+              const Divider(height: 1, indent: 64, endIndent: 16),
               _settingsTile(
                 icon: Icons.delete_outline,
                 iconColor: Colors.red,
@@ -341,9 +572,9 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                 titleColor: Colors.red,
                 onTap: _confirmDeleteHistory,
               ),
-              const Divider(height: 1, indent: 56, endIndent: 14),
+              const Divider(height: 1, indent: 64, endIndent: 16),
               _settingsTile(
-                icon: Icons.logout,
+                icon: Icons.logout_rounded,
                 iconColor: Colors.red,
                 title: 'ออกจากระบบ',
                 titleColor: Colors.red,
@@ -352,12 +583,14 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
             ],
           ),
         ),
-
         const SizedBox(height: 16),
         Center(
           child: Text(
             'Calorie Scanner v1.0.0',
-            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withOpacity(0.70),
+            ),
           ),
         ),
       ],
@@ -371,31 +604,25 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
     Color? titleColor,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: CircleAvatar(
-        radius: 16,
-        backgroundColor: iconColor.withValues(alpha: 0.10),
-        child: Icon(icon, size: 18, color: iconColor),
-      ),
-      title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: titleColor)),
-      trailing: const Icon(Icons.chevron_right, size: 20),
+    return HoverScale(
+      borderRadius: BorderRadius.circular(18),
       onTap: onTap,
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Helper
-  // ---------------------------------------------------------------------------
-  Widget _infoTile(ColorScheme cs, {required IconData icon, required String title, required String subtitle}) {
-    return Card(
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
           radius: 18,
-          backgroundColor: cs.primary.withValues(alpha: 0.10),
-          child: Icon(icon, color: cs.primary, size: 20),
+          backgroundColor: iconColor.withOpacity(0.10),
+          child: Icon(icon, size: 18, color: iconColor),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-        subtitle: Text(subtitle, style: TextStyle(color: cs.onSurfaceVariant)),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: titleColor,
+          ),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+        onTap: onTap,
       ),
     );
   }

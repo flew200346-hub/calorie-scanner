@@ -3,6 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'user_profile.dart';
+import 'widgets/cosmic_background.dart';
+import 'widgets/frosted_card.dart';
+import 'widgets/hover_scale.dart';
 
 class ProfileEditPage extends StatefulWidget {
   const ProfileEditPage({super.key});
@@ -43,6 +46,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _age.text = (data['age'] ?? '').toString();
     _height.text = (data['heightCm'] ?? '').toString();
     _weight.text = (data['weightKg'] ?? '').toString();
+
     if (mounted) setState(() {});
   }
 
@@ -58,13 +62,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
 
     setState(() => _loading = true);
+
     try {
       await _doc().set(p.toMap(), SetOptions(merge: true));
       if (mounted) Navigator.pop(context);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง')),
+        const SnackBar(
+          content: Text('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง'),
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -83,109 +90,231 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text(
-              'ให้ตะโก้รู้จักคุณหน่อยนะ 😊',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text('Edit Profile'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: CosmicBackground(
+        useSafeArea: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                _buildPageTitle(),
+                const SizedBox(height: 16),
+                FrostedCard(
+                  borderRadius: BorderRadius.circular(28),
+                  padding: const EdgeInsets.all(22),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'ข้อมูลส่วนตัว',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'กรอกข้อมูลเพื่อช่วยในการคำนวณและบันทึกแคลอรี่',
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 18),
+                        _buildInputField(
+                          controller: _firstName,
+                          label: 'ชื่อจริง',
+                          icon: Icons.person_outline,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'กรอกชื่อจริง'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInputField(
+                          controller: _nickName,
+                          label: 'ชื่อเล่น',
+                          icon: Icons.badge_outlined,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'กรอกชื่อเล่น'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInputField(
+                          controller: _age,
+                          label: 'อายุ (ปี)',
+                          icon: Icons.cake_outlined,
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final n = int.tryParse((v ?? '').trim());
+                            if (n == null || n <= 0) {
+                              return 'กรอกอายุให้ถูกต้อง';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInputField(
+                          controller: _height,
+                          label: 'ส่วนสูง (cm)',
+                          icon: Icons.height,
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final n = double.tryParse((v ?? '').trim());
+                            if (n == null || n <= 0) {
+                              return 'กรอกส่วนสูงให้ถูกต้อง';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInputField(
+                          controller: _weight,
+                          label: 'น้ำหนัก (kg)',
+                          icon: Icons.monitor_weight_outlined,
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final n = double.tryParse((v ?? '').trim());
+                            if (n == null || n <= 0) {
+                              return 'กรอกน้ำหนักให้ถูกต้อง';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        HoverScale(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: _loading ? null : _save,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF7C5CFF),
+                                  Color(0xFF5E8BFF),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      const Color(0xFF7C5CFF).withOpacity(0.30),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: SizedBox(
+                              height: 54,
+                              child: FilledButton(
+                                onPressed: _loading ? null : _save,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                                child: _loading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'บันทึก',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              'กรอกข้อมูลเพื่อช่วยในการคำนวณ/บันทึก',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  TextFormField(
-                    controller: _firstName,
-                    decoration: const InputDecoration(
-                      labelText: 'ชื่อจริง',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person),
-                    ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'กรอกชื่อจริง' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _nickName,
-                    decoration: const InputDecoration(
-                      labelText: 'ชื่อเล่น',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.tag_faces),
-                    ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'กรอกชื่อเล่น' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _age,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'อายุ (ปี)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.cake_outlined),
-                    ),
-                    validator: (v) {
-                      final n = int.tryParse((v ?? '').trim());
-                      if (n == null || n <= 0) return 'กรอกอายุให้ถูกต้อง';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _height,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'ส่วนสูง (cm)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.height),
-                    ),
-                    validator: (v) {
-                      final n = double.tryParse((v ?? '').trim());
-                      if (n == null || n <= 0) return 'กรอกส่วนสูงให้ถูกต้อง';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _weight,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'น้ำหนัก (kg)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.monitor_weight_outlined),
-                    ),
-                    validator: (v) {
-                      final n = double.tryParse((v ?? '').trim());
-                      if (n == null || n <= 0) return 'กรอกน้ำหนักให้ถูกต้อง';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: _loading ? null : _save,
-                    child: _loading
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('บันทึก'),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPageTitle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'แก้ไขโปรไฟล์',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'อัปเดตข้อมูลส่วนตัวเพื่อให้ระบบคำนวณได้แม่นยำขึ้น',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.78),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.04),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.08),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(
+            color: Color(0xFF7C5CFF),
+            width: 1.4,
+          ),
         ),
       ),
     );

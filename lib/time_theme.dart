@@ -1,14 +1,15 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 enum DayPhase { morning, noon, evening, night }
 
 DayPhase phaseFrom(DateTime now) {
   final h = now.hour;
-  if (h >= 6 && h < 11) return DayPhase.morning; // 06-10
-  if (h >= 11 && h < 16) return DayPhase.noon; // 11-15
-  if (h >= 16 && h < 19) return DayPhase.evening; // 16-18
-  return DayPhase.night; // 19-05
+  if (h >= 6 && h < 11) return DayPhase.morning;
+  if (h >= 11 && h < 16) return DayPhase.noon;
+  if (h >= 16 && h < 19) return DayPhase.evening;
+  return DayPhase.night;
 }
 
 class TimeThemeController extends ChangeNotifier {
@@ -16,7 +17,6 @@ class TimeThemeController extends ChangeNotifier {
   late final Timer _timer;
 
   TimeThemeController() {
-    // อัปเดตทุก 1 นาที (พอสำหรับเปลี่ยนช่วงเวลา)
     _timer = Timer.periodic(const Duration(minutes: 1), (_) => _tick());
   }
 
@@ -37,129 +37,392 @@ class TimeThemeController extends ChangeNotifier {
   }
 }
 
-/// สี+ฉากหลังตามช่วงเวลา
 class TimeTheme {
   static Color seed(DayPhase p) {
     switch (p) {
       case DayPhase.morning:
-        return const Color(0xFFFFB74D); // อุ่นๆ
+        return const Color(0xFF8BC6A2);
       case DayPhase.noon:
-        return const Color(0xFF42A5F5); // ฟ้าใส
+        return const Color(0xFF6CB6E8);
       case DayPhase.evening:
-        return const Color(0xFFFF7043); // ส้มเย็น
+        return const Color(0xFFF29B7A);
       case DayPhase.night:
-        return const Color(0xFF5C6BC0); // คราม
+        return const Color(0xFF7E8BC7);
     }
   }
 
   static List<Color> backgroundGradient(DayPhase p) {
     switch (p) {
       case DayPhase.morning:
-        return const [Color(0xFFFFF3E0), Color(0xFFF7F4FB)];
+        return const [
+          Color(0xFFFFF6E9),
+          Color(0xFFF9F7FF),
+          Color(0xFFF6FBF8),
+        ];
       case DayPhase.noon:
-        return const [Color(0xFFE3F2FD), Color(0xFFF7F4FB)];
+        return const [
+          Color(0xFFE8F5FF),
+          Color(0xFFF6FAFF),
+          Color(0xFFF7FBFF),
+        ];
       case DayPhase.evening:
-        return const [Color(0xFFFFE0B2), Color(0xFFF7F4FB)];
+        return const [
+          Color(0xFFFFE8DC),
+          Color(0xFFFFF4EE),
+          Color(0xFFF9F7FF),
+        ];
       case DayPhase.night:
-        return const [Color(0xFF0D1B3D), Color(0xFF121B2D)];
+        return const [
+          Color(0xFF16213A),
+          Color(0xFF1D2946),
+          Color(0xFF243459),
+        ];
     }
   }
 
-  /// วงกลม “ดวงอาทิตย์/พระจันทร์” (ตำแหน่ง+สี)
-  static _OrbStyle orb(DayPhase p) {
-    switch (p) {
-      case DayPhase.morning:
-        return _OrbStyle(
-          color: const Color(0xFFFFD54F),
-          glow: const Color(0xFFFFF59D),
-          alignment: const Alignment(0.75, -0.85),
-        );
-      case DayPhase.noon:
-        return _OrbStyle(
-          color: const Color(0xFFFFEB3B),
-          glow: const Color(0xFFFFF9C4),
-          alignment: const Alignment(0.60, -0.95),
-        );
-      case DayPhase.evening:
-        return _OrbStyle(
-          color: const Color(0xFFFF8A65),
-          glow: const Color(0xFFFFCCBC),
-          alignment: const Alignment(0.75, -0.80),
-        );
-      case DayPhase.night:
-        return _OrbStyle(
-          color: const Color(0xFFECEFF1),
-          glow: const Color(0xFFB0BEC5),
-          alignment: const Alignment(0.75, -0.88),
-        );
-    }
-  }
-
-  /// Widget ฉากหลังที่ใช้ได้ทุกหน้า
   static Widget background({
     required DayPhase phase,
     required Widget child,
   }) {
     final grad = backgroundGradient(phase);
-    final orb = TimeTheme.orb(phase);
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: grad,
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: grad,
+            ),
+          ),
         ),
-      ),
-      child: Stack(
-        children: [
-          // orb (sun/moon)
-          Align(
-            alignment: orb.alignment,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 70,
-                    spreadRadius: 20,
-                    color: orb.glow
-                        .withOpacity(phase == DayPhase.night ? 0.18 : 0.22),
-                  ),
-                ],
-                gradient: RadialGradient(
-                  colors: [
-                    orb.color.withOpacity(0.95),
-                    orb.color.withOpacity(0.55),
-                    orb.color.withOpacity(0.0),
-                  ],
-                  stops: const [0.0, 0.55, 1.0],
-                ),
-              ),
+
+        // ลายพื้นหลังโค้ง ๆ เบา ๆ
+        const Positioned.fill(
+          child: IgnorePointer(
+            child: _SoftPatternLayer(),
+          ),
+        ),
+
+        // เมฆ/หมอกบาง ๆ
+        if (phase != DayPhase.night)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: _CloudLayer(),
             ),
           ),
 
-          // stars (เฉพาะกลางคืน)
-          if (phase == DayPhase.night) ...[
-            const _StarsLayer(),
-          ],
+        // ดวงอาทิตย์
+        if (phase == DayPhase.morning || phase == DayPhase.noon)
+          Align(
+            alignment: phase == DayPhase.morning
+                ? const Alignment(0.72, -0.82)
+                : const Alignment(0.62, -0.92),
+            child: const _SunOrb(),
+          ),
 
-          // เนื้อหาจริง
-          child,
+        // แสงเย็น
+        if (phase == DayPhase.evening)
+          const Align(
+            alignment: Alignment(0.78, -0.83),
+            child: _EveningOrb(),
+          ),
+
+        // ดวงจันทร์
+        if (phase == DayPhase.night)
+          const Align(
+            alignment: Alignment(0.72, -0.85),
+            child: _MoonOrb(),
+          ),
+
+        // ดาว
+        if (phase == DayPhase.night)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: _StarsLayer(),
+            ),
+          ),
+
+        // layer บาง ๆ ให้ดูฟุ้ง
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                color: phase == DayPhase.night
+                    ? Colors.white.withOpacity(0.02)
+                    : Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ),
+        ),
+
+        child,
+      ],
+    );
+  }
+}
+
+class _SoftPatternLayer extends StatelessWidget {
+  const _SoftPatternLayer();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _SoftPatternPainter(),
+      size: Size.infinite,
+    );
+  }
+}
+
+class _SoftPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p1 = Paint()..color = Colors.white.withOpacity(0.10);
+    final p2 = Paint()..color = Colors.white.withOpacity(0.06);
+
+    final path1 = Path()
+      ..moveTo(-40, size.height * 0.16)
+      ..quadraticBezierTo(
+        size.width * 0.30,
+        size.height * 0.05,
+        size.width * 0.62,
+        size.height * 0.18,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.88,
+        size.height * 0.28,
+        size.width + 60,
+        size.height * 0.14,
+      )
+      ..lineTo(size.width + 60, -20)
+      ..lineTo(-40, -20)
+      ..close();
+
+    final path2 = Path()
+      ..moveTo(-50, size.height * 0.30)
+      ..quadraticBezierTo(
+        size.width * 0.24,
+        size.height * 0.22,
+        size.width * 0.45,
+        size.height * 0.34,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.82,
+        size.height * 0.48,
+        size.width + 40,
+        size.height * 0.28,
+      )
+      ..lineTo(size.width + 40, -20)
+      ..lineTo(-50, -20)
+      ..close();
+
+    canvas.drawPath(path1, p1);
+    canvas.drawPath(path2, p2);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SunOrb extends StatefulWidget {
+  const _SunOrb();
+
+  @override
+  State<_SunOrb> createState() => _SunOrbState();
+}
+
+class _SunOrbState extends State<_SunOrb> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+      lowerBound: 0.96,
+      upperBound: 1.04,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _controller,
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const RadialGradient(
+            colors: [
+              Color(0xFFFFF176),
+              Color(0xFFFFD54F),
+              Color(0xFFFFB300),
+            ],
+            stops: [0.0, 0.55, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 70,
+              spreadRadius: 12,
+              color: Colors.amber.withOpacity(0.36),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EveningOrb extends StatefulWidget {
+  const _EveningOrb();
+
+  @override
+  State<_EveningOrb> createState() => _EveningOrbState();
+}
+
+class _EveningOrbState extends State<_EveningOrb>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+      lowerBound: 0.97,
+      upperBound: 1.03,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _controller,
+      child: Container(
+        width: 110,
+        height: 110,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const RadialGradient(
+            colors: [
+              Color(0xFFFFCC80),
+              Color(0xFFFF8A65),
+              Color(0xFFFF7043),
+            ],
+            stops: [0.0, 0.55, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 70,
+              spreadRadius: 14,
+              color: const Color(0xFFFF8A65).withOpacity(0.34),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoonOrb extends StatelessWidget {
+  const _MoonOrb();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 96,
+      height: 96,
+      child: Stack(
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFF4F7FB),
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 60,
+                  spreadRadius: 12,
+                  color: Colors.white.withOpacity(0.18),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 10,
+            top: 8,
+            child: Container(
+              width: 84,
+              height: 84,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF243459),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _OrbStyle {
-  final Color color;
-  final Color glow;
-  final Alignment alignment;
-  const _OrbStyle(
-      {required this.color, required this.glow, required this.alignment});
+class _CloudLayer extends StatelessWidget {
+  const _CloudLayer();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _CloudPainter(),
+      size: Size.infinite,
+    );
+  }
+}
+
+class _CloudPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white.withOpacity(0.18);
+
+    void cloud(double x, double y, double scale) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(x, y),
+          width: 130 * scale,
+          height: 46 * scale,
+        ),
+        paint,
+      );
+      canvas.drawCircle(
+          Offset(x - 34 * scale, y - 4 * scale), 24 * scale, paint);
+      canvas.drawCircle(Offset(x, y - 12 * scale), 28 * scale, paint);
+      canvas.drawCircle(
+          Offset(x + 34 * scale, y - 5 * scale), 20 * scale, paint);
+    }
+
+    cloud(size.width * 0.20, size.height * 0.16, 0.9);
+    cloud(size.width * 0.82, size.height * 0.22, 0.75);
+    cloud(size.width * 0.40, size.height * 0.26, 0.65);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _StarsLayer extends StatelessWidget {
@@ -167,12 +430,9 @@ class _StarsLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ดาวแบบเบาๆ ไม่ใช้ asset
-    return IgnorePointer(
-      child: CustomPaint(
-        painter: _StarsPainter(),
-        size: Size.infinite,
-      ),
+    return CustomPaint(
+      painter: _StarsPainter(),
+      size: Size.infinite,
     );
   }
 }
@@ -180,21 +440,28 @@ class _StarsLayer extends StatelessWidget {
 class _StarsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFFECEFF1).withOpacity(0.25);
+    final paint = Paint()..color = const Color(0xFFF5F7FF).withOpacity(0.35);
+
     final stars = <Offset>[
-      Offset(size.width * 0.15, size.height * 0.12),
-      Offset(size.width * 0.32, size.height * 0.18),
-      Offset(size.width * 0.55, size.height * 0.10),
-      Offset(size.width * 0.72, size.height * 0.22),
-      Offset(size.width * 0.85, size.height * 0.14),
-      Offset(size.width * 0.20, size.height * 0.28),
-      Offset(size.width * 0.42, size.height * 0.30),
-      Offset(size.width * 0.62, size.height * 0.28),
+      Offset(size.width * 0.12, size.height * 0.10),
+      Offset(size.width * 0.20, size.height * 0.18),
+      Offset(size.width * 0.33, size.height * 0.12),
+      Offset(size.width * 0.46, size.height * 0.08),
+      Offset(size.width * 0.58, size.height * 0.16),
+      Offset(size.width * 0.70, size.height * 0.11),
+      Offset(size.width * 0.82, size.height * 0.19),
+      Offset(size.width * 0.90, size.height * 0.10),
+      Offset(size.width * 0.28, size.height * 0.26),
+      Offset(size.width * 0.62, size.height * 0.27),
     ];
+
     for (final s in stars) {
-      canvas.drawCircle(s, 1.6, paint);
+      canvas.drawCircle(s, 1.7, paint);
       canvas.drawCircle(
-          s.translate(8, 6), 1.1, paint..color = paint.color.withOpacity(0.18));
+        s.translate(7, 5),
+        1.0,
+        Paint()..color = const Color(0xFFF5F7FF).withOpacity(0.18),
+      );
     }
   }
 
