@@ -70,9 +70,7 @@ class _LoginPageState extends State<LoginPage>
     } catch (_) {
       _showError('เข้าสู่ระบบไม่สำเร็จ');
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -83,11 +81,6 @@ class _LoginPageState extends State<LoginPage>
         behavior: SnackBarBehavior.floating,
       ),
     );
-  }
-
-  bool get _isNight {
-    final h = DateTime.now().hour;
-    return h >= 18 || h < 6;
   }
 
   @override
@@ -106,16 +99,16 @@ class _LoginPageState extends State<LoginPage>
                 child: SlideTransition(
                   position: _slide,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 430),
+                    constraints: const BoxConstraints(maxWidth: 320),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(32),
+                      borderRadius: BorderRadius.circular(24),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                         child: Container(
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: cs.surface.withOpacity(0.78),
-                            borderRadius: BorderRadius.circular(32),
+                            borderRadius: BorderRadius.circular(22),
                             border: Border.all(
                               color: Colors.white.withOpacity(0.10),
                             ),
@@ -130,8 +123,8 @@ class _LoginPageState extends State<LoginPage>
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _buildTopBadge(context),
-                              const SizedBox(height: 20),
+                              _buildTopBadge(),
+                              const SizedBox(height: 16),
                               Text(
                                 'ยินดีต้อนรับกลับ',
                                 style: Theme.of(context)
@@ -235,26 +228,16 @@ class _LoginPageState extends State<LoginPage>
                               Row(
                                 children: [
                                   Expanded(
-                                    child: Divider(
-                                      color: cs.outlineVariant,
-                                    ),
-                                  ),
+                                      child: Divider(color: cs.outlineVariant)),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    child: Text(
-                                      'หรือ',
-                                      style: TextStyle(
-                                        color: cs.onSurfaceVariant,
-                                      ),
-                                    ),
+                                        horizontal: 12),
+                                    child: Text('หรือ',
+                                        style: TextStyle(
+                                            color: cs.onSurfaceVariant)),
                                   ),
                                   Expanded(
-                                    child: Divider(
-                                      color: cs.outlineVariant,
-                                    ),
-                                  ),
+                                      child: Divider(color: cs.outlineVariant)),
                                 ],
                               ),
                               const SizedBox(height: 16),
@@ -280,32 +263,22 @@ class _LoginPageState extends State<LoginPage>
                                         ),
                                       );
                                     },
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(
-                                        color: cs.outlineVariant,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                    ),
                                     icon: const Icon(Icons.person_add_alt_1),
                                     label: const Text(
                                       'สร้างบัญชีใหม่',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                          fontWeight: FontWeight.w700),
                                     ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 18),
+                              const SizedBox(height: 14),
                               Text(
                                 'Calorie Scanner',
                                 style: TextStyle(
                                   color: cs.onSurfaceVariant,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.3,
                                 ),
                               ),
                             ],
@@ -323,44 +296,32 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
-  Widget _buildTopBadge(BuildContext context) {
-    final isNight = _isNight;
-
+  // ✅ ไอคอนใหม่ (ไม่บัง background)
+  Widget _buildTopBadge() {
     return Container(
-      width: 92,
-      height: 92,
+      width: 54,
+      height: 54,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: isNight
-              ? const [
-                  Color(0xFF9BA8FF),
-                  Color(0xFF6D7DFF),
-                ]
-              : const [
-                  Color(0xFFFFD65A),
-                  Color(0xFFFFA726),
-                ],
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF7C5CFF),
+            Color(0xFF5E8BFF),
+          ],
         ),
         boxShadow: [
           BoxShadow(
-            color: (isNight ? const Color(0xFF8EA0FF) : const Color(0xFFFFC84D))
-                .withOpacity(0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF7C5CFF).withOpacity(0.30),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Container(
-        margin: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.10),
-        ),
+      child: const Center(
         child: Icon(
-          isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded,
+          Icons.restaurant_rounded,
           color: Colors.white,
-          size: 42,
+          size: 32,
         ),
       ),
     );
@@ -388,24 +349,9 @@ class _LoginPageState extends State<LoginPage>
         prefixIcon: const Icon(Icons.mail_outline_rounded),
         filled: true,
         fillColor: cs.surfaceContainerHighest.withOpacity(0.45),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: cs.outlineVariant.withOpacity(0.55),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: cs.primary,
-            width: 1.4,
-          ),
         ),
       ),
     );
@@ -426,24 +372,9 @@ class _LoginPageState extends State<LoginPage>
         ),
         filled: true,
         fillColor: cs.surfaceContainerHighest.withOpacity(0.45),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: cs.outlineVariant.withOpacity(0.55),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: cs.primary,
-            width: 1.4,
-          ),
         ),
       ),
     );
