@@ -17,10 +17,12 @@ Future<void> main() async {
     'dotenv key length: ${dotenv.get('GEMINI_API_KEY', fallback: '').trim().length}',
   );
 
-  if (Firebase.apps.isEmpty) {
+  try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+  } on FirebaseException catch (e) {
+    if (e.code != 'duplicate-app') rethrow;
   }
 
   runApp(const MyApp());
@@ -59,12 +61,6 @@ class _MyAppState extends State<MyApp> {
           title: 'Calorie Scanner',
           debugShowCheckedModeBanner: false,
           theme: _buildTheme(cs),
-          builder: (context, child) {
-            return TimeTheme.background(
-              phase: _time.phase,
-              child: child ?? const SizedBox.shrink(),
-            );
-          },
           home: const AuthGate(),
         );
       },
@@ -221,8 +217,23 @@ class AuthGate extends StatelessWidget {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
+            body: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF171C35),
+                    Color(0xFF273463),
+                    Color(0xFF4656C9),
+                  ],
+                ),
+              ),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                ),
+              ),
             ),
           );
         }

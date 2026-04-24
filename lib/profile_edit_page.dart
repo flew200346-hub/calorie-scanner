@@ -23,6 +23,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   final _height = TextEditingController();
   final _weight = TextEditingController();
 
+  String _gender = 'other';
+  String _activityLevel = 'light';
+
   bool _loading = false;
 
   DocumentReference<Map<String, dynamic>> _doc() {
@@ -47,10 +50,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _height.text = (data['heightCm'] ?? '').toString();
     _weight.text = (data['weightKg'] ?? '').toString();
 
+    final g = (data['gender'] ?? '').toString();
+    if (genderLabels.containsKey(g)) _gender = g;
+
+    final a = (data['activityLevel'] ?? '').toString();
+    if (activityLabels.containsKey(a)) _activityLevel = a;
+
     if (mounted) setState(() {});
   }
 
   Future<void> _save() async {
+    if (_loading) return;
     if (!_formKey.currentState!.validate()) return;
 
     final p = UserProfile(
@@ -59,23 +69,29 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       age: int.parse(_age.text.trim()),
       heightCm: double.parse(_height.text.trim()),
       weightKg: double.parse(_weight.text.trim()),
+      gender: _gender,
+      activityLevel: _activityLevel,
     );
 
     setState(() => _loading = true);
 
-    try {
-      await _doc().set(p.toMap(), SetOptions(merge: true));
-      if (mounted) Navigator.pop(context);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    final email = FirebaseAuth.instance.currentUser?.email;
+
+    final payload = {
+      ...p.toMap(),
+      if (email != null) 'email': email,
+    };
+
+    _doc().set(payload, SetOptions(merge: true)).catchError((_) {
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง'),
         ),
       );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    });
+
+    Navigator.pop(context);
   }
 
   @override
@@ -189,10 +205,40 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             return null;
                           },
                         ),
+                        const SizedBox(height: 12),
+                        _buildDropdown<String>(
+                          value: _gender,
+                          label: 'เพศ',
+                          icon: Icons.wc_outlined,
+                          items: genderLabels.entries
+                              .map((e) => DropdownMenuItem(
+                                    value: e.key,
+                                    child: Text(e.value),
+                                  ))
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _gender = v ?? _gender),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildDropdown<String>(
+                          value: _activityLevel,
+                          label: 'ระดับการเคลื่อนไหว',
+                          icon: Icons.directions_run_outlined,
+                          items: activityLabels.entries
+                              .map((e) => DropdownMenuItem(
+                                    value: e.key,
+                                    child: Text(
+                                      e.value,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _activityLevel = v ?? _activityLevel),
+                        ),
                         const SizedBox(height: 20),
                         HoverScale(
                           borderRadius: BorderRadius.circular(18),
-                          onTap: _loading ? null : _save,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
@@ -290,31 +336,51 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       controller: controller,
       keyboardType: keyboardType,
       validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.04),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 18,
+      decoration: _decoration(label: label, icon: icon),
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required T value,
+    required String label,
+    required IconData icon,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return DropdownButtonFormField<T>(
+      initialValue: value,
+      isExpanded: true,
+      items: items,
+      onChanged: onChanged,
+      decoration: _decoration(label: label, icon: icon),
+    );
+  }
+
+  InputDecoration _decoration({required String label, required IconData icon}) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.04),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 18,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: Colors.white.withOpacity(0.08),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.08),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(
-            color: Color(0xFF7C5CFF),
-            width: 1.4,
-          ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(
+          color: Color(0xFF7C5CFF),
+          width: 1.4,
         ),
       ),
     );

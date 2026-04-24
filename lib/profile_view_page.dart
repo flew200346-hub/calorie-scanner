@@ -172,6 +172,8 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
   }
 
   Widget _buildEmptyState(ColorScheme cs) {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -200,6 +202,17 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                if (email.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    email,
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Text(
                   'สร้างโปรไฟล์เพื่อให้แอปคำนวณและบันทึกข้อมูลได้ดีขึ้น',

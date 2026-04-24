@@ -46,136 +46,131 @@ class _CosmicBackgroundState extends State<CosmicBackground>
   Widget build(BuildContext context) {
     final isNight = _isNight;
 
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final floatY = lerpDouble(-4, 6, _controller.value) ?? 0;
-        final glowScale = lerpDouble(0.96, 1.06, _controller.value) ?? 1.0;
-
-        return Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isNight
-                      ? const [
-                          Color(0xFF171C35),
-                          Color(0xFF273463),
-                          Color(0xFF4656C9),
-                        ]
-                      : const [
-                          Color(0xFF1D2A57),
-                          Color(0xFF4967D6),
-                          Color(0xFF89D8FF),
-                        ],
+    return Stack(
+      children: [
+        RepaintBoundary(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isNight
+                    ? const [
+                        Color(0xFF171C35),
+                        Color(0xFF273463),
+                        Color(0xFF4656C9),
+                      ]
+                    : const [
+                        Color(0xFF1D2A57),
+                        Color(0xFF4967D6),
+                        Color(0xFF89D8FF),
+                      ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -50,
+          left: -20,
+          child: RepaintBoundary(
+            child: _blurBlob(
+              size: 190,
+              color: isNight
+                  ? const Color(0xFF8C7BFF).withOpacity(0.18)
+                  : const Color(0xFFFFD36E).withOpacity(0.20),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 140,
+          right: -60,
+          child: RepaintBoundary(
+            child: _blurBlob(
+              size: 230,
+              color: isNight
+                  ? const Color(0xFF6BE0FF).withOpacity(0.14)
+                  : const Color(0xFF7EE7FF).withOpacity(0.18),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: -70,
+          left: -30,
+          child: RepaintBoundary(
+            child: _blurBlob(
+              size: 250,
+              color: isNight
+                  ? const Color(0xFFFF7AD9).withOpacity(0.12)
+                  : const Color(0xFFFF9ACB).withOpacity(0.12),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _WavePainter(isNight: isNight),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 86,
+          right: 10,
+          child: RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final floatY = lerpDouble(-4, 6, _controller.value) ?? 0;
+                final glowScale =
+                    lerpDouble(0.96, 1.06, _controller.value) ?? 1.0;
+                return Transform.translate(
+                  offset: Offset(0, floatY),
+                  child: _CelestialOrb(
+                    isNight: isNight,
+                    glowScale: glowScale,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (widget.showStars && isNight)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) {
+                    final v = _controller.value;
+                    return Stack(
+                      children: [
+                        _AnimatedStar(
+                            top: 88, left: 34, size: 4, progress: v, phase: 0.15),
+                        _AnimatedStar(
+                            top: 130, left: 110, size: 3, progress: v, phase: 0.45),
+                        _AnimatedStar(
+                            top: 170, left: 62, size: 2.5, progress: v, phase: 0.75),
+                        _AnimatedStar(
+                            top: 220, right: 120, size: 3, progress: v, phase: 0.25),
+                        _AnimatedStar(
+                            top: 280, right: 42, size: 4, progress: v, phase: 0.60),
+                        _AnimatedStar(
+                            bottom: 180, left: 70, size: 3, progress: v, phase: 0.35),
+                        _AnimatedStar(
+                            bottom: 250, right: 95, size: 2.5, progress: v, phase: 0.85),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
-            Positioned(
-              top: -50,
-              left: -20,
-              child: _blurBlob(
-                size: 190,
-                color: isNight
-                    ? const Color(0xFF8C7BFF).withOpacity(0.18)
-                    : const Color(0xFFFFD36E).withOpacity(0.20),
-              ),
-            ),
-            Positioned(
-              top: 140,
-              right: -60,
-              child: _blurBlob(
-                size: 230,
-                color: isNight
-                    ? const Color(0xFF6BE0FF).withOpacity(0.14)
-                    : const Color(0xFF7EE7FF).withOpacity(0.18),
-              ),
-            ),
-            Positioned(
-              bottom: -70,
-              left: -30,
-              child: _blurBlob(
-                size: 250,
-                color: isNight
-                    ? const Color(0xFFFF7AD9).withOpacity(0.12)
-                    : const Color(0xFFFF9ACB).withOpacity(0.12),
-              ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _WavePainter(isNight: isNight),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 86 + floatY,
-              right: 10,
-              child: _CelestialOrb(
-                isNight: isNight,
-                glowScale: glowScale,
-              ),
-            ),
-            if (widget.showStars && isNight) ...[
-              _AnimatedStar(
-                top: 88,
-                left: 34,
-                size: 4,
-                progress: _controller.value,
-                phase: 0.15,
-              ),
-              _AnimatedStar(
-                top: 130,
-                left: 110,
-                size: 3,
-                progress: _controller.value,
-                phase: 0.45,
-              ),
-              _AnimatedStar(
-                top: 170,
-                left: 62,
-                size: 2.5,
-                progress: _controller.value,
-                phase: 0.75,
-              ),
-              _AnimatedStar(
-                top: 220,
-                right: 120,
-                size: 3,
-                progress: _controller.value,
-                phase: 0.25,
-              ),
-              _AnimatedStar(
-                top: 280,
-                right: 42,
-                size: 4,
-                progress: _controller.value,
-                phase: 0.60,
-              ),
-              _AnimatedStar(
-                bottom: 180,
-                left: 70,
-                size: 3,
-                progress: _controller.value,
-                phase: 0.35,
-              ),
-              _AnimatedStar(
-                bottom: 250,
-                right: 95,
-                size: 2.5,
-                progress: _controller.value,
-                phase: 0.85,
-              ),
-            ],
-            if (widget.useSafeArea)
-              SafeArea(child: widget.child)
-            else
-              widget.child,
-          ],
-        );
-      },
+          ),
+        if (widget.useSafeArea)
+          SafeArea(child: widget.child)
+        else
+          widget.child,
+      ],
     );
   }
 

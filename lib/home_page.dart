@@ -3,7 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'exercise_page.dart';
+import 'food_result_page.dart';
 import 'scan_page.dart';
+import 'user_profile.dart';
 import 'widgets/cosmic_background.dart';
 import 'widgets/frosted_card.dart';
 import 'widgets/hover_scale.dart';
@@ -18,6 +20,27 @@ const Map<String, Color> _mealColors = {
 
 Color _colorOf(String meal) => _mealColors[meal] ?? const Color(0xFF7BBFA1);
 
+class _DailyTotals {
+  final int calories;
+  final int carbsG;
+  final int proteinG;
+  final int fatG;
+
+  const _DailyTotals({
+    required this.calories,
+    required this.carbsG,
+    required this.proteinG,
+    required this.fatG,
+  });
+
+  static const empty = _DailyTotals(
+    calories: 0,
+    carbsG: 0,
+    proteinG: 0,
+    fatG: 0,
+  );
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -29,7 +52,7 @@ class _HomePageState extends State<HomePage> {
   final _searchCtrl = TextEditingController();
   String _selectedMeal = 'มื้อเช้า';
 
-  final int _dailyGoal = 1955;
+  static const int _fallbackGoal = 2000;
 
   @override
   void dispose() {
@@ -51,7 +74,7 @@ class _HomePageState extends State<HomePage> {
   DateTime _endOfDay(DateTime d) =>
       DateTime(d.year, d.month, d.day, 23, 59, 59, 999);
 
-  Stream<int> _todayCaloriesStream() {
+  Stream<_DailyTotals> _todayTotalsStream() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final now = DateTime.now();
     final start = Timestamp.fromDate(_startOfDay(now));
@@ -63,22 +86,45 @@ class _HomePageState extends State<HomePage> {
         .where('createdAt', isLessThanOrEqualTo: end)
         .snapshots()
         .map((q) {
-      int sum = 0;
+      double cal = 0, carbs = 0, protein = 0, fat = 0;
       for (final d in q.docs) {
-        final c = d.data()['calories'];
-        if (c is num) sum += c.round();
+        final m = d.data();
+        cal += _num(m['calories']);
+        carbs += _num(m['carbohydrates_total_g']);
+        protein += _num(m['protein_g']);
+        fat += _num(m['fat_total_g']);
       }
-      return sum;
+      return _DailyTotals(
+        calories: cal.round(),
+        carbsG: carbs.round(),
+        proteinG: protein.round(),
+        fatG: fat.round(),
+      );
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> _recentFoodsStream() {
+  static double _num(dynamic v) => v is num ? v.toDouble() : 0;
+
+  Stream<List<Map<String, dynamic>>> _recentUniqueFoodsStream() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return _mealsCol()
         .where('uid', isEqualTo: uid)
         .orderBy('createdAt', descending: true)
-        .limit(6)
-        .snapshots();
+        .limit(40)
+        .snapshots()
+        .map((q) {
+      final seen = <String>{};
+      final result = <Map<String, dynamic>>[];
+      for (final doc in q.docs) {
+        final data = doc.data();
+        final name = (data['foodName'] ?? '').toString().trim();
+        if (name.isEmpty || seen.contains(name)) continue;
+        seen.add(name);
+        result.add(data);
+        if (result.length >= 8) break;
+      }
+      return result;
+    });
   }
 
   Stream<int> _mealCaloriesToday(String mealType) {
@@ -244,60 +290,83 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTodayCard(ColorScheme cs) {
-    return StreamBuilder<int>(
-      stream: _todayCaloriesStream(),
-      builder: (context, snap) {
-        final eaten = snap.data ?? 0;
-        final remain = (_dailyGoal - eaten).clamp(0, 999999);
-        final pct =
-            _dailyGoal <= 0 ? 0.0 : (eaten / _dailyGoal).clamp(0.0, 1.0);
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _userDoc().snapshots(),
+      builder: (context, profileSnap) {
+        final profileData = profileSnap.data?.data();
+        final profile =
+            profileData == null ? null : UserProfile.fromMap(profileData);
+        final goal = (profile?.dailyCalorieGoal ?? 0) > 0
+            ? profile!.dailyCalorieGoal
+            : _fallbackGoal;
 
-        return FrostedCard(
-          borderRadius: BorderRadius.circular(30),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Calories Today',
-                style: TextStyle(
-                  color: cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '$eaten / $_dailyGoal kcal',
-                style: const TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 14),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: pct,
-                  minHeight: 16,
-                  backgroundColor: cs.surfaceContainerHighest.withOpacity(0.55),
-                  valueColor:
-                      const AlwaysStoppedAnimation<Color>(Color(0xFF8B7CFF)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
+        return StreamBuilder<_DailyTotals>(
+          stream: _todayTotalsStream(),
+          builder: (context, totalsSnap) {
+            final eaten = (totalsSnap.data ?? _DailyTotals.empty).calories;
+            final remain = (goal - eaten).clamp(0, 999999);
+            final pct = goal <= 0 ? 0.0 : (eaten / goal).clamp(0.0, 1.0);
+
+            return FrostedCard(
+              borderRadius: BorderRadius.circular(30),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _miniInfo(cs, title: 'เหลือ', value: '$remain kcal'),
-                  const SizedBox(width: 10),
-                  _miniInfo(
-                    cs,
-                    title: 'สำเร็จ',
-                    value: '${(pct * 100).round()}%',
+                  Text(
+                    'Calories Today',
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '$eaten / $goal kcal',
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (profile == null || profile.dailyCalorieGoal <= 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'กรอกโปรไฟล์เพื่อคำนวณเป้าหมายจริงของคุณ',
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      minHeight: 16,
+                      backgroundColor:
+                          cs.surfaceContainerHighest.withOpacity(0.55),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFF8B7CFF),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      _miniInfo(cs, title: 'เหลือ', value: '$remain kcal'),
+                      const SizedBox(width: 10),
+                      _miniInfo(
+                        cs,
+                        title: 'สำเร็จ',
+                        value: '${(pct * 100).round()}%',
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -557,7 +626,7 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'ล่าสุด',
+          'อาหารที่เคยกิน',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
@@ -565,8 +634,8 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(height: 12),
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _recentFoodsStream(),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _recentUniqueFoodsStream(),
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
               return const FrostedCard(
@@ -577,8 +646,8 @@ class _HomePageState extends State<HomePage> {
               );
             }
 
-            final docs = snap.data?.docs ?? [];
-            if (docs.isEmpty) {
+            final foods = snap.data ?? const [];
+            if (foods.isEmpty) {
               return FrostedCard(
                 child: Row(
                   children: [
@@ -603,9 +672,9 @@ class _HomePageState extends State<HomePage> {
               padding: EdgeInsets.zero,
               child: Column(
                 children: [
-                  for (int i = 0; i < docs.length; i++) ...[
-                    _recentFoodTile(docs[i]),
-                    if (i != docs.length - 1)
+                  for (int i = 0; i < foods.length; i++) ...[
+                    _recentFoodTile(foods[i]),
+                    if (i != foods.length - 1)
                       const Divider(height: 1, indent: 64, endIndent: 16),
                   ],
                 ],
@@ -617,8 +686,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _recentFoodTile(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
+  Widget _recentFoodTile(Map<String, dynamic> data) {
     final mealType = (data['mealType'] ?? _selectedMeal).toString();
     final foodName = (data['foodName'] ?? 'Food').toString();
     final calories =
@@ -627,7 +695,7 @@ class _HomePageState extends State<HomePage> {
 
     return HoverScale(
       borderRadius: BorderRadius.circular(18),
-      onTap: () => _goMealScan(mealType, prefillFoodName: foodName),
+      onTap: () => _reuseFood(data),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
@@ -651,57 +719,107 @@ class _HomePageState extends State<HomePage> {
           style: TextStyle(color: Colors.white.withOpacity(0.68)),
         ),
         trailing: IconButton(
+          tooltip: 'บันทึกอีกครั้ง',
           icon: Icon(Icons.add_circle_outline_rounded, color: c),
-          onPressed: () => _goMealScan(mealType, prefillFoodName: foodName),
+          onPressed: () => _reuseFood(data),
+        ),
+      ),
+    );
+  }
+
+  void _reuseFood(Map<String, dynamic> data) {
+    double toD(dynamic v) => v is num ? v.toDouble() : 0.0;
+
+    final foodName = (data['foodName'] ?? 'Food').toString();
+    final mealType = (data['mealType'] ?? _selectedMeal).toString();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FoodResultPage(
+          foodName: foodName,
+          thaiName: foodName,
+          confidence: toD(data['confidence']),
+          mealType: mealType,
+          calories: toD(data['calories']),
+          protein: toD(data['protein_g']),
+          fat: toD(data['fat_total_g']),
+          carbs: toD(data['carbohydrates_total_g']),
+          servingSize: (data['servingSize'] ?? '1 จาน').toString(),
         ),
       ),
     );
   }
 
   Widget _buildNutritionSection(ColorScheme cs) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Nutrition Breakdown',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 12),
-        FrostedCard(
-          child: const Column(
-            children: [
-              _MacroRow(
-                label: 'Carbs',
-                leftText: '40%',
-                rightText: '30%',
-                value: 0.40,
-                color: Colors.orange,
-              ),
-              SizedBox(height: 12),
-              _MacroRow(
-                label: 'Fats',
-                leftText: '30%',
-                rightText: '30%',
-                value: 0.30,
-                color: Colors.purple,
-              ),
-              SizedBox(height: 12),
-              _MacroRow(
-                label: 'Protein',
-                leftText: '30%',
-                rightText: '40%',
-                value: 0.30,
-                color: Colors.green,
-              ),
-            ],
-          ),
-        ),
-      ],
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _userDoc().snapshots(),
+      builder: (context, profileSnap) {
+        final pData = profileSnap.data?.data();
+        final profile = pData == null ? null : UserProfile.fromMap(pData);
+
+        return StreamBuilder<_DailyTotals>(
+          stream: _todayTotalsStream(),
+          builder: (context, totalsSnap) {
+            final t = totalsSnap.data ?? _DailyTotals.empty;
+
+            final carbsTarget = profile?.carbsTargetG ?? 0;
+            final proteinTarget = profile?.proteinTargetG ?? 0;
+            final fatTarget = profile?.fatTargetG ?? 0;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Nutrition Breakdown',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FrostedCard(
+                  child: Column(
+                    children: [
+                      _MacroRow(
+                        label: 'Carbs',
+                        leftText: '${t.carbsG}g',
+                        rightText: carbsTarget > 0 ? '/ ${carbsTarget}g' : '/ -',
+                        value: _safeRatio(t.carbsG, carbsTarget),
+                        color: Colors.orange,
+                      ),
+                      const SizedBox(height: 12),
+                      _MacroRow(
+                        label: 'Fats',
+                        leftText: '${t.fatG}g',
+                        rightText: fatTarget > 0 ? '/ ${fatTarget}g' : '/ -',
+                        value: _safeRatio(t.fatG, fatTarget),
+                        color: Colors.purple,
+                      ),
+                      const SizedBox(height: 12),
+                      _MacroRow(
+                        label: 'Protein',
+                        leftText: '${t.proteinG}g',
+                        rightText:
+                            proteinTarget > 0 ? '/ ${proteinTarget}g' : '/ -',
+                        value: _safeRatio(t.proteinG, proteinTarget),
+                        color: Colors.green,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+  }
+
+  static double _safeRatio(int actual, int target) {
+    if (target <= 0) return 0;
+    return (actual / target).clamp(0.0, 1.0);
   }
 }
 

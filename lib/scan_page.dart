@@ -1,10 +1,14 @@
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'food_result_page.dart';
 import 'services/gemini_service.dart';
+import 'services/thai_food_names.dart';
+import 'services/tflite_service.dart';
 import 'widgets/cosmic_background.dart';
 import 'widgets/frosted_card.dart';
 import 'widgets/hover_scale.dart';
@@ -34,6 +38,7 @@ class _ScanPageState extends State<ScanPage> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _foodNameCtrl = TextEditingController();
   final GeminiService _geminiService = GeminiService();
+  final TfliteService _tflite = TfliteService();
 
   Uint8List? _imageBytes;
   late String _meal;
@@ -49,11 +54,14 @@ class _ScanPageState extends State<ScanPage> {
     if (initName.isNotEmpty) {
       _foodNameCtrl.text = initName;
     }
+
+    _tflite.init();
   }
 
   @override
   void dispose() {
     _foodNameCtrl.dispose();
+    _tflite.dispose();
     super.dispose();
   }
 
@@ -70,6 +78,88 @@ class _ScanPageState extends State<ScanPage> {
       _imageBytes = bytes;
       _nutritionResult = null;
     });
+  }
+
+  Future<Map<String, dynamic>?> _runAnalysis(Uint8List bytes) async {
+    // 1) Try on-device tflite first
+    if (_tflite.isReady) {
+      final tf = await _tflite.classify(bytes, minConfidence: 0.5);
+      if (tf != null) {
+        final thaiName = labelToThai(tf.label);
+        debugPrint(
+          '[Scan] tflite hit: ${tf.label} -> $thaiName (conf=${tf.confidence.toStringAsFixed(2)})',
+        );
+
+        // 2a) Check cache — if this user has saved this food before, reuse
+        final cached = await _fetchCachedNutrition(thaiName);
+        if (cached != null) {
+          debugPrint('[Scan] cache hit for "$thaiName" — skipping Gemini');
+          return {
+            ...cached,
+            'food_name': thaiName,
+            'confidence': tf.confidence,
+            'source': 'cache',
+          };
+        }
+
+        // 2b) No cache → ask Gemini for nutrition
+        final nutrition = await _geminiService.getNutrition(thaiName);
+        if (nutrition != null) {
+          return {
+            ...nutrition,
+            'food_name': thaiName,
+            'confidence': tf.confidence,
+            'source': 'tflite',
+          };
+        }
+        debugPrint('[Scan] Gemini.getNutrition failed — falling back to vision');
+      } else {
+        debugPrint('[Scan] tflite returned null or low confidence');
+      }
+    } else {
+      debugPrint('[Scan] tflite not ready — using Gemini vision');
+    }
+
+    // 3) Fallback: full Gemini vision
+    final visionResult = await _geminiService.detectFoodFromImage(bytes);
+    if (visionResult != null) {
+      return {...visionResult, 'source': 'gemini'};
+    }
+    return null;
+  }
+
+  /// Look up previously-saved nutrition for this user+food.
+  /// Uses only single-field indexes (no composite index setup needed).
+  /// Returns null if not found. Converts storage keys back to Gemini format.
+  Future<Map<String, dynamic>?> _fetchCachedNutrition(String thaiName) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
+    try {
+      final q = await FirebaseFirestore.instance
+          .collection('meals')
+          .where('uid', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+
+      for (final doc in q.docs) {
+        final d = doc.data();
+        if ((d['foodName'] ?? '').toString().trim() != thaiName) continue;
+        return {
+          'food_name': thaiName,
+          'serving_size': (d['servingSize'] ?? '1 จาน').toString(),
+          'calories_kcal': _toDouble(d['calories']),
+          'protein_g': _toDouble(d['protein_g']),
+          'fat_g': _toDouble(d['fat_total_g']),
+          'carbs_g': _toDouble(d['carbohydrates_total_g']),
+        };
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[Scan] cache lookup error: $e');
+      return null;
+    }
   }
 
   Future<void> _analyzeImage() async {
@@ -91,7 +181,7 @@ class _ScanPageState extends State<ScanPage> {
     );
 
     try {
-      final result = await _geminiService.detectFoodFromImage(_imageBytes!);
+      final result = await _runAnalysis(_imageBytes!);
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -100,7 +190,11 @@ class _ScanPageState extends State<ScanPage> {
 
       if (result == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gemini วิเคราะห์รูปไม่สำเร็จ')),
+          SnackBar(
+            content: Text(_errorMessage()),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
         return;
       }
@@ -144,15 +238,15 @@ class _ScanPageState extends State<ScanPage> {
           ),
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       Navigator.pop(context);
       setState(() => _isAnalyzing = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เกิดข้อผิดพลาด: $e'),
+        const SnackBar(
+          content: Text('วิเคราะห์ไม่สำเร็จ กรุณาลองใหม่'),
           backgroundColor: Colors.red,
         ),
       );
@@ -162,6 +256,23 @@ class _ScanPageState extends State<ScanPage> {
   double _toDouble(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0.0;
+  }
+
+  String _errorMessage() {
+    switch (_geminiService.lastError) {
+      case GeminiErrorCode.quota:
+        return 'ใช้งาน AI ถึงโควต้าของวันแล้ว ลองใหม่ตอน 16:00';
+      case GeminiErrorCode.busy:
+        return 'AI กำลังไม่ว่าง ลองใหม่อีกสักครู่';
+      case GeminiErrorCode.network:
+        return 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ ตรวจสอบสัญญาณ';
+      case GeminiErrorCode.noApiKey:
+        return 'ยังไม่ได้ตั้งค่า API key';
+      case GeminiErrorCode.badResponse:
+        return 'AI ตอบกลับผิดรูปแบบ ลองถ่ายใหม่ หรือเลือกรูปอื่น';
+      case GeminiErrorCode.none:
+        return 'AI วิเคราะห์รูปไม่สำเร็จ';
+    }
   }
 
   Color _colorOf(String meal) => _mealColors[meal] ?? Colors.blueGrey;
@@ -274,11 +385,21 @@ class _ScanPageState extends State<ScanPage> {
                       Expanded(
                         child: HoverScale(
                           borderRadius: BorderRadius.circular(999),
-                          onTap: () => _pickImage(ImageSource.camera),
                           child: FilledButton.icon(
                             onPressed: () => _pickImage(ImageSource.camera),
-                            icon: const Icon(Icons.camera_alt_outlined),
-                            label: const Text('ถ่ายรูป'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              shape: const StadiumBorder(),
+                            ),
+                            icon: const Icon(Icons.camera_alt_outlined, size: 20),
+                            label: const Text(
+                              'ถ่ายรูป',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ),
@@ -286,11 +407,21 @@ class _ScanPageState extends State<ScanPage> {
                       Expanded(
                         child: HoverScale(
                           borderRadius: BorderRadius.circular(999),
-                          onTap: () => _pickImage(ImageSource.gallery),
                           child: OutlinedButton.icon(
                             onPressed: () => _pickImage(ImageSource.gallery),
-                            icon: const Icon(Icons.photo_library_outlined),
-                            label: const Text('เลือกรูป'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              shape: const StadiumBorder(),
+                            ),
+                            icon: const Icon(Icons.photo_library_outlined, size: 20),
+                            label: const Text(
+                              'เลือกรูป',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ),

@@ -68,17 +68,47 @@ class _LoginPageState extends State<LoginPage>
         password: _passwordCtrl.text.trim(),
       );
     } catch (_) {
-      _showError('เข้าสู่ระบบไม่สำเร็จ');
+      _showSnack('เข้าสู่ระบบไม่สำเร็จ');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _showError(String msg) {
+  Future<void> _forgotPassword() async {
+    final email = _emailCtrl.text.trim();
+
+    if (email.isEmpty) {
+      _showSnack('กรุณากรอกอีเมลก่อน');
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      _showSnack(
+        'ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ $email แล้ว กรุณาเช็คอีเมล',
+        color: Colors.green,
+      );
+    } on FirebaseAuthException catch (e) {
+      final msg = switch (e.code) {
+        'invalid-email' => 'รูปแบบอีเมลไม่ถูกต้อง',
+        'user-not-found' => 'ไม่พบบัญชีของอีเมลนี้',
+        _ => 'ส่งอีเมลไม่สำเร็จ ลองใหม่อีกครั้ง',
+      };
+      _showSnack(msg);
+    } catch (_) {
+      _showSnack('ส่งอีเมลไม่สำเร็จ ลองใหม่อีกครั้ง');
+    }
+  }
+
+  void _showSnack(String msg, {Color? color}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: color,
       ),
     );
   }
@@ -157,7 +187,7 @@ class _LoginPageState extends State<LoginPage>
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: TextButton(
-                                  onPressed: () {},
+                                  onPressed: _loading ? null : _forgotPassword,
                                   child: const Text('ลืมรหัสผ่าน?'),
                                 ),
                               ),

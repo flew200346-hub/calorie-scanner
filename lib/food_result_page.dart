@@ -45,60 +45,77 @@ class _FoodResultPageState extends State<FoodResultPage> {
   bool _saved = false;
   bool _saving = false;
 
+  /// Serving multiplier (½, 1, 1½, 2, 3 จาน)
+  double _portion = 1.0;
+
   Color get _accentColor =>
       _mealColors[widget.mealType] ?? const Color(0xFF4CAF50);
 
+  double get _calories => widget.calories * _portion;
+  double get _protein => widget.protein * _portion;
+  double get _fat => widget.fat * _portion;
+  double get _carbs => widget.carbs * _portion;
+
+  String get _portionLabel {
+    if (_portion == 0.5) return '½ จาน';
+    if (_portion == 1.0) return '1 จาน';
+    if (_portion == 1.5) return '1½ จาน';
+    return '${_portion.toStringAsFixed(0)} จาน';
+  }
+
   Future<void> _saveMeal() async {
-    setState(() => _saving = true);
+    if (_saved || _saving) return;
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      if (mounted) {
-        setState(() => _saving = false);
-        _showDialog(
-          icon: const Icon(Icons.error_outline, color: Colors.red, size: 48),
-          title: 'บันทึกไม่สำเร็จ',
-          content: 'ไม่พบผู้ใช้ที่ล็อกอินอยู่',
-        );
-      }
+      _showDialog(
+        icon: const Icon(Icons.error_outline, color: Colors.red, size: 48),
+        title: 'บันทึกไม่สำเร็จ',
+        content: 'ไม่พบผู้ใช้ที่ล็อกอินอยู่',
+      );
       return;
     }
 
-    try {
-      await FirebaseFirestore.instance.collection('meals').add({
-        'uid': uid,
-        'foodName': widget.thaiName,
-        'mealType': widget.mealType,
-        'calories': widget.calories,
-        'protein_g': widget.protein,
-        'fat_total_g': widget.fat,
-        'carbohydrates_total_g': widget.carbs,
-        'confidence': widget.confidence,
-        'servingSize': widget.servingSize,
-        'createdAt': Timestamp.now(),
-      });
+    setState(() {
+      _saving = true;
+      _saved = true;
+    });
 
-      if (mounted) {
-        setState(() {
-          _saved = true;
-          _saving = false;
-        });
-        _showDialog(
-          icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
-          title: 'บันทึกสำเร็จ',
-          content: 'บันทึก "${widget.thaiName}" เรียบร้อยแล้ว',
+    final messenger = ScaffoldMessenger.of(context);
+
+    FirebaseFirestore.instance.collection('meals').add({
+      'uid': uid,
+      'foodName': widget.thaiName,
+      'mealType': widget.mealType,
+      'calories': _calories,
+      'protein_g': _protein,
+      'fat_total_g': _fat,
+      'carbohydrates_total_g': _carbs,
+      'confidence': widget.confidence,
+      'servingSize': _portionLabel,
+      'portion': _portion,
+      'createdAt': Timestamp.now(),
+    }).then(
+      (_) {},
+      onError: (_) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง'),
+            backgroundColor: Colors.red,
+          ),
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _saving = false);
-        _showDialog(
-          icon: const Icon(Icons.error_outline, color: Colors.red, size: 48),
-          title: 'บันทึกไม่สำเร็จ',
-          content: '$e',
-        );
-      }
-    }
+      },
+    );
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('บันทึก "${widget.thaiName}" เรียบร้อยแล้ว'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    setState(() => _saving = false);
   }
 
   void _showDialog({
@@ -186,14 +203,14 @@ class _FoodResultPageState extends State<FoodResultPage> {
               ),
             ),
             const SizedBox(height: 24),
-            Center(child: _buildCalorieCircle(widget.calories)),
+            Center(child: _buildCalorieCircle(_calories)),
             const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
                   child: _macroCard(
                     'Protein',
-                    widget.protein,
+                    _protein,
                     'g',
                     Colors.redAccent,
                     Icons.fitness_center,
@@ -203,7 +220,7 @@ class _FoodResultPageState extends State<FoodResultPage> {
                 Expanded(
                   child: _macroCard(
                     'Fat',
-                    widget.fat,
+                    _fat,
                     'g',
                     Colors.orange,
                     Icons.water_drop,
@@ -213,7 +230,7 @@ class _FoodResultPageState extends State<FoodResultPage> {
                 Expanded(
                   child: _macroCard(
                     'Carbs',
-                    widget.carbs,
+                    _carbs,
                     'g',
                     Colors.blueAccent,
                     Icons.grain,
@@ -222,20 +239,7 @@ class _FoodResultPageState extends State<FoodResultPage> {
               ],
             ),
             const SizedBox(height: 20),
-            FrostedCard(
-              borderRadius: BorderRadius.circular(20),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: _accentColor.withOpacity(0.15),
-                  child: Icon(Icons.restaurant, color: _accentColor),
-                ),
-                title: Text(
-                  widget.mealType,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: Text('ปริมาณ: ${widget.servingSize}'),
-              ),
-            ),
+            _buildPortionSelector(),
             const SizedBox(height: 20),
             FrostedCard(
               borderRadius: BorderRadius.circular(20),
@@ -250,13 +254,13 @@ class _FoodResultPageState extends State<FoodResultPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  _nutritionRow('ขนาดจาน', _portionLabel),
                   _nutritionRow(
-                      'พลังงาน', '${widget.calories.toStringAsFixed(0)} kcal'),
+                      'พลังงาน', '${_calories.toStringAsFixed(0)} kcal'),
+                  _nutritionRow('โปรตีน', '${_protein.toStringAsFixed(0)} g'),
+                  _nutritionRow('ไขมัน', '${_fat.toStringAsFixed(0)} g'),
                   _nutritionRow(
-                      'โปรตีน', '${widget.protein.toStringAsFixed(0)} g'),
-                  _nutritionRow('ไขมัน', '${widget.fat.toStringAsFixed(0)} g'),
-                  _nutritionRow(
-                      'คาร์โบไฮเดรต', '${widget.carbs.toStringAsFixed(0)} g'),
+                      'คาร์โบไฮเดรต', '${_carbs.toStringAsFixed(0)} g'),
                   _nutritionRow(
                     'ความมั่นใจ',
                     '${(widget.confidence * 100).toStringAsFixed(1)}%',
@@ -364,6 +368,87 @@ class _FoodResultPageState extends State<FoodResultPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPortionSelector() {
+    const options = [0.5, 1.0, 1.5, 2.0, 3.0];
+    String label(double v) {
+      if (v == 0.5) return '½';
+      if (v == 1.0) return '1';
+      if (v == 1.5) return '1½';
+      return v.toStringAsFixed(0);
+    }
+
+    return FrostedCard(
+      borderRadius: BorderRadius.circular(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: _accentColor.withOpacity(0.15),
+                child: Icon(Icons.restaurant, color: _accentColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.mealType,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      'ขนาดจาน: $_portionLabel',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: options.map((v) {
+              final selected = _portion == v;
+              return ChoiceChip(
+                selected: selected,
+                showCheckmark: false,
+                onSelected: (_) {
+                  if (_saved) return;
+                  setState(() => _portion = v);
+                },
+                label: Text(
+                  '×${label(v)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: selected ? Colors.white : _accentColor,
+                  ),
+                ),
+                backgroundColor: Colors.white.withOpacity(0.06),
+                selectedColor: _accentColor,
+                side: BorderSide(
+                  color: _accentColor.withOpacity(selected ? 0 : 0.30),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 

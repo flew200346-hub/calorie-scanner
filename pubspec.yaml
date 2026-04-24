@@ -17,6 +17,10 @@ dependencies:
 
   # 📸 Image
   image_picker: ^1.1.2
+  image: ^4.5.4
+
+  # 🧠 On-device AI
+  tflite_flutter: ^0.11.0
 
   # 🔥 Firebase
   firebase_core: ^3.4.0
@@ -48,3 +52,5 @@ flutter:
   assets:
     - .env
     - assets/icon/icon3.png
+    - assets/best_float32.tflite
+    - assets/labels.txt
