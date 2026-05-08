@@ -1,3 +1,12 @@
+// ============================================================================
+// app_shell.dart — wrapper หลัง login (มี bottom navigation)
+// ----------------------------------------------------------------------------
+// 3 tab: Home / Scan / Profile (ใช้ NavigationBar ของ M3)
+// ใช้ AnimatedSwitcher → เปลี่ยน tab มี slide+fade animation
+// แต่ละ tab มี CosmicBackground ของตัวเอง (ไม่ wrap รวมที่ shell
+// เพื่อหลีกเลี่ยง background ซ้อนกัน 2 ชั้น)
+// ============================================================================
+
 import 'dart:ui';
 
 import 'package:flutter/material.dart';

@@ -1,3 +1,16 @@
+// ============================================================================
+// scan_page.dart — หน้าสแกนอาหาร (จุดศูนย์กลางของแอป)
+// ----------------------------------------------------------------------------
+// Flow ของ _runAnalysis (สำคัญที่สุด — เปลี่ยนตรงนี้บ่อย):
+//   1) tflite (on-device, ฟรี, เร็ว) → ถ้า conf ≥ 0.5 ใช้ label นั้น
+//   2) เช็ค cache (meals doc ของ user เคยบันทึกหรือไม่) → skip Gemini
+//   3) ถ้าไม่มี cache → Gemini.getNutrition(thaiName) → ขอโภชนาการ
+//   4) ถ้า tflite miss/conf ต่ำ → Gemini.detectFoodFromImage(รูป) วิเคราะห์ทั้งรูป
+//
+// แต่ละ result มี field "source" บอกที่มา: 'cache' / 'tflite' / 'gemini'
+// ใช้ debug ดู log ได้ว่ามาจากไหน
+// ============================================================================
+
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -80,6 +93,9 @@ class _ScanPageState extends State<ScanPage> {
     });
   }
 
+  /// 4-step pipeline: tflite → cache → Gemini.getNutrition → Gemini.detectFood
+  /// คืน Map ในรูปแบบ Gemini ({food_name, calories_kcal, protein_g, fat_g, carbs_g, ...})
+  /// + เพิ่ม field `source` บอกที่มา
   Future<Map<String, dynamic>?> _runAnalysis(Uint8List bytes) async {
     // 1) Try on-device tflite first
     if (_tflite.isReady) {
@@ -128,9 +144,10 @@ class _ScanPageState extends State<ScanPage> {
     return null;
   }
 
-  /// Look up previously-saved nutrition for this user+food.
-  /// Uses only single-field indexes (no composite index setup needed).
-  /// Returns null if not found. Converts storage keys back to Gemini format.
+  /// Smart cache: หาว่า user เคยบันทึกอาหารชื่อนี้มาก่อนมั้ย
+  /// ถ้าเจอ → ใช้ข้อมูลเดิม → skip Gemini call (ประหยัด quota + เร็ว)
+  /// query โดยใช้ uid + sort by createdAt + filter foodName client-side
+  /// (หลีกเลี่ยง composite index ที่ต้อง setup ใน Firebase Console)
   Future<Map<String, dynamic>?> _fetchCachedNutrition(String thaiName) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return null;
@@ -258,6 +275,8 @@ class _ScanPageState extends State<ScanPage> {
     return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
 
+  /// แปลง GeminiErrorCode → ข้อความไทยที่ user เข้าใจ
+  /// ใช้ตอนสแกนไม่สำเร็จ (Gemini fail หลัง tflite ก็ fail)
   String _errorMessage() {
     switch (_geminiService.lastError) {
       case GeminiErrorCode.quota:

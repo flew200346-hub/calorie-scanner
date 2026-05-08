@@ -1,3 +1,16 @@
+// ============================================================================
+// calorie_ninjas_service.dart —  DEAD CODE (ไม่ถูก import ที่ไหนเลย)
+// ----------------------------------------------------------------------------
+// service สำหรับเรียก CalorieNinjas API ดูโภชนาการจาก label ที่ tflite ระบุ
+// มี _queryMap แม็ป label → English query (ใช้ตอนเรียก API)
+//
+// ทำไมไม่ใช้:
+//   - ต้อง API key (ไม่ฟรีถ้าใช้เยอะ — 10k/เดือน)
+//   - ปัจจุบัน Gemini.getNutrition ทำหน้าที่นี้ครบจบในตัว
+//
+// เก็บไว้ถ้าอยากย้ายไป hybrid (CalorieNinjas + Gemini) ในอนาคต — แม่นกว่าบางเคส
+// ============================================================================
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';

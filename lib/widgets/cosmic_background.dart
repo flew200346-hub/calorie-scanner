@@ -1,3 +1,19 @@
+// ============================================================================
+// cosmic_background.dart — พื้นหลังหลักของแอป (gradient + ดวงอาทิตย์/จันทร์ + ดาว)
+// ----------------------------------------------------------------------------
+// ใช้ใน: ทุกหน้า (login, register, home, scan, food_result, profile_*)
+// เลือก theme ตามเวลา: 18:00-05:59 = night (จันทร์ + ดาวกระพริบ)
+//                       06:00-17:59 = day (อาทิตย์ + ฟ้าใส)
+//
+// Performance optimization (สำคัญ — เปลี่ยนแล้วระวัง):
+//   - layers แยก static/animated:
+//     • gradient + 3 blur blobs + WavePainter → static (RepaintBoundary cache)
+//     • orb (อาทิตย์/จันทร์) → AnimatedBuilder เฉพาะ float+glow
+//     • stars → AnimatedBuilder กระพริบ
+//   - blur sigma=26 หนักมาก — RepaintBoundary cache เป็น layer หลังเฟรมแรก
+//   - ทุก layer ใหญ่ wrap RepaintBoundary → ไม่ re-paint ทุกเฟรม
+// ============================================================================
+
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';

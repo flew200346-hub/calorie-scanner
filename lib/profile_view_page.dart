@@ -1,3 +1,17 @@
+// ============================================================================
+// profile_view_page.dart — แสดงโปรไฟล์ + ประวัติมื้ออาหาร + จัดการบัญชี
+// ----------------------------------------------------------------------------
+// 2 stream หลัก:
+//   - _profileStream  → users/{uid} (real-time, แก้แล้ว update ทันที)
+//   - _historyStream  → meals ล่าสุด 20 ของ user (orderBy createdAt desc)
+//
+// State:
+//   - empty state (ยังไม่มี doc) → ปุ่ม "สร้างโปรไฟล์" + แสดง email
+//   - normal     → header + grid (อายุ/สูง/น้ำหนัก/edit) + history + settings
+//
+// Actions: edit profile, ลบประวัติทั้งหมด (batch delete), logout
+// ============================================================================
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';

@@ -1,3 +1,19 @@
+// ============================================================================
+// profile_edit_page.dart — ฟอร์มแก้ไขโปรไฟล์
+// ----------------------------------------------------------------------------
+// Fields: ชื่อจริง, ชื่อเล่น, อายุ, ส่วนสูง, น้ำหนัก, เพศ, ระดับกิจกรรม
+// (เพศ + กิจกรรม = ปัจจัยสำคัญในสูตร TDEE — ดู user_profile.dart)
+//
+// Save flow (instant UX):
+//   1) Validate form → setState(_loading = true)
+//   2) ยิง Firestore.set(merge:true) แบบไม่ await
+//   3) Navigator.pop() กลับทันที
+//   4) profile_view_page รีเฟรชเอง (ใช้ .snapshots() listener)
+//   5) ถ้า fail → SnackBar แดงในหน้าก่อนหน้า (capture messenger ก่อน pop)
+//
+// บันทึก field "email" ด้วย เพื่อ link profile กับ auth account ชัดเจน
+// ============================================================================
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';

@@ -1,3 +1,14 @@
+// ============================================================================
+// login_page.dart — หน้า login (เปิดมาเป็นหน้าแรกถ้ายังไม่ login)
+// ----------------------------------------------------------------------------
+// 3 ปุ่ม:
+//   - "เข้าสู่ระบบ"      → _login()  → FirebaseAuth.signInWithEmailAndPassword
+//   - "ลืมรหัสผ่าน?"    → _forgotPassword() → sendPasswordResetEmail
+//   - "สมัคร"           → push RegisterPage
+//
+// Auth state เปลี่ยน → AuthGate (main.dart) detect → เด้งไป AppShell อัตโนมัติ
+// ============================================================================
+
 import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -74,6 +85,10 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
+  /// ส่งอีเมล reset password ผ่าน Firebase Auth
+  /// - email ว่าง → SnackBar เตือน
+  /// - error แยกข้อความตาม code (invalid-email / user-not-found / อื่นๆ)
+  /// template ปรับได้ที่ Firebase Console → Auth → Templates → Password reset
   Future<void> _forgotPassword() async {
     final email = _emailCtrl.text.trim();
 

@@ -1,3 +1,16 @@
+// ============================================================================
+// hover_scale.dart — wrapper ที่ทำให้ widget ขยับเมื่อ hover/tap
+// ----------------------------------------------------------------------------
+// behavior:
+//   - hover (mouse) → ขยายเล็กน้อย (1.04) + ลอย (translate Y -4)
+//   - tap (กดค้าง)   → หด (0.97)
+//   - smooth animation 160ms
+//
+// ⚠️ ระวัง onTap ซ้อน: ถ้า child เป็น Button ที่มี onPressed ของตัวเอง
+// → ตั้ง HoverScale(onTap: null) เพื่อไม่ให้ tap ยิง 2 ครั้ง
+// (HitTestBehavior.translucent ทำให้ tap ทะลุไปถึง child)
+// ============================================================================
+
 import 'package:flutter/material.dart';
 
 class HoverScale extends StatefulWidget {

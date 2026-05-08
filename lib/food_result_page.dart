@@ -1,3 +1,18 @@
+// ============================================================================
+// food_result_page.dart — แสดงผลวิเคราะห์อาหาร + ปรับ portion + บันทึก
+// ----------------------------------------------------------------------------
+// รับค่าจาก scan_page (หรือ home_page เมื่อกดอาหารที่เคยกิน)
+// ฟีเจอร์หลัก:
+//   - แสดงแคล/protein/fat/carbs ที่ scale ตาม _portion (½, 1, 1½, 2, 3 จาน)
+//   - กด "บันทึก" → fire-and-forget Firestore (instant UX)
+//     บันทึกค่าที่ scaled แล้ว (ตรงกับที่กินจริง) + portion + servingSize label
+//   - หลังบันทึก disable chip portion + ปุ่ม save (กันบันทึกซ้ำ)
+//
+// Firestore collection: "meals"
+// Schema: {uid, foodName, mealType, calories, protein_g, fat_total_g,
+//          carbohydrates_total_g, confidence, servingSize, portion, createdAt}
+// ============================================================================
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -45,7 +60,9 @@ class _FoodResultPageState extends State<FoodResultPage> {
   bool _saved = false;
   bool _saving = false;
 
-  /// Serving multiplier (½, 1, 1½, 2, 3 จาน)
+  /// Serving multiplier — scale ค่าโภชนาการทุกตัวเมื่อ user เลือก chip
+  /// ค่าเริ่มต้น 1.0 = 1 จาน (ตามที่ AI ประเมินมา)
+  /// _calories, _protein, _fat, _carbs (getters) คูณ _portion ทุกครั้งที่ build
   double _portion = 1.0;
 
   Color get _accentColor =>
@@ -63,6 +80,10 @@ class _FoodResultPageState extends State<FoodResultPage> {
     return '${_portion.toStringAsFixed(0)} จาน';
   }
 
+  /// บันทึกมื้ออาหารแบบ fire-and-forget (UX instant)
+  /// - ไม่ await Firestore → pop กลับทันที, sync เบื้องหลัง
+  /// - error → SnackBar แดงในหน้าก่อนหน้า (capture messenger ก่อน pop)
+  /// - guard `_saved || _saving` กันยิงซ้ำ
   Future<void> _saveMeal() async {
     if (_saved || _saving) return;
 

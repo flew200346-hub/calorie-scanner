@@ -1,5 +1,18 @@
+// ============================================================================
+// user_profile.dart — โมเดลข้อมูลโปรไฟล์ + สูตรคำนวณ TDEE/macros
+// ----------------------------------------------------------------------------
+// เก็บที่ Firestore: collection "users" → doc id = uid
+// ใช้ที่:
+//   - profile_view_page (แสดงผล)
+//   - profile_edit_page (ฟอร์มกรอก)
+//   - home_page (คำนวณเป้าแคล + macro targets)
+// สูตร: Mifflin-St Jeor BMR × activity factor (ดู getter ด้านล่าง)
+// ============================================================================
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// Activity multiplier — มาจากสูตรมาตรฐาน Harris-Benedict / Mifflin
+// ค่า 1.375 (light) คือ default — ขยับน้อย-เบา 1-3 วัน/สัปดาห์
 const _activityFactors = <String, double>{
   'sedentary': 1.2,
   'light': 1.375,
@@ -59,7 +72,10 @@ class UserProfile {
 
   static String _toStr(dynamic v) => (v ?? '').toString().trim();
 
-  // Mifflin-St Jeor BMR (kcal/day)
+  // ----- คำนวณพลังงานพื้นฐาน (BMR) ด้วยสูตร Mifflin-St Jeor -----
+  // Men:    BMR = 10W + 6.25H - 5A + 5
+  // Women:  BMR = 10W + 6.25H - 5A - 161
+  // Other:  เฉลี่ยกลาง (-78) — กรณีไม่ระบุเพศ
   double get bmr {
     final base = 10 * weightKg + 6.25 * heightCm - 5 * age;
     switch (gender) {
@@ -74,12 +90,18 @@ class UserProfile {
 
   double get activityFactor => _activityFactors[activityLevel] ?? 1.375;
 
+  /// TDEE = BMR × activity factor (kcal ที่ควรกินต่อวัน)
+  /// คืน 0 ถ้า profile ยังไม่ครบ → home_page จะ fallback เป็น 2000
   int get dailyCalorieGoal {
     if (age <= 0 || heightCm <= 0 || weightKg <= 0) return 0;
     return (bmr * activityFactor).round();
   }
 
-  // Macro targets in grams (50% carbs, 25% protein, 25% fat)
+  // Macro targets เป็นกรัม
+  // ใช้สัดส่วน 50/25/25 ของแคลทั้งหมด:
+  //   - Carbs 50% (4 kcal/g)
+  //   - Protein 25% (4 kcal/g)
+  //   - Fat 25% (9 kcal/g)
   int get carbsTargetG => (dailyCalorieGoal * 0.50 / 4).round();
   int get proteinTargetG => (dailyCalorieGoal * 0.25 / 4).round();
   int get fatTargetG => (dailyCalorieGoal * 0.25 / 9).round();

@@ -1,5 +1,13 @@
+// ============================================================================
+// thai_food_names.dart — แม็ป label จาก tflite → ชื่ออาหารภาษาไทย
+// ----------------------------------------------------------------------------
+// labels.txt เก็บชื่อ English transliterated เช่น "Pad-Thai", "Green-Curry"
+// ใช้ที่ scan_page._runAnalysis: เมื่อ tflite ระบุได้ ก่อนถาม Gemini
+// nutrition + ก่อนแสดงให้ user → เรียก labelToThai() เพื่อแปลง
+// เพิ่มเมนูใหม่: เพิ่มทั้งใน labels.txt (ตอน train model) + map ตรงนี้
+// ============================================================================
+
 /// Maps TFLite label names (from assets/labels.txt) to Thai display names.
-/// Used to convert English-transliterated labels back to Thai for UI + Gemini queries.
 const Map<String, String> thaiFoodNames = {
   'BBQ-Pork-Rice': 'ข้าวหมูแดง',
   'Bitter-Melon-Soup': 'แกงจืดมะระ',

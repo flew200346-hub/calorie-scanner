@@ -1,3 +1,18 @@
+// ============================================================================
+// gemini_service.dart — เรียก Google Gemini API (cloud AI)
+// ----------------------------------------------------------------------------
+// 2 endpoint หลัก:
+//   1) detectFoodFromImage(bytes) — ส่งรูป → ได้ JSON {ชื่อ, แคล, P, F, C}
+//      ใช้ตอน tflite ไม่รู้จักรูป (fallback) หรือ tflite ไม่พร้อม
+//
+//   2) getNutrition(thaiFoodName) — ส่งชื่ออาหาร → ได้ JSON เดียวกัน
+//      ใช้คู่กับ tflite — tflite ระบุชื่อ → ถามโภชนาการ
+//
+// ทั้ง 2 endpoint ใช้ model "gemini-2.5-flash" (free tier 250 RPD)
+// มี auto-retry สำหรับ 503/504 (server overload) สูงสุด 3 ครั้ง
+// expose `lastError` เพื่อให้ scan_page แสดงข้อความที่ตรงกับสาเหตุ
+// ============================================================================
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -5,10 +20,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-/// Reason a Gemini call failed, exposed to UI for better error messages.
+/// สาเหตุที่ Gemini call fail — ใช้ใน scan_page แสดง SnackBar ที่ตรงสาเหตุ
+///   - quota   = 429 (ใช้เกิน 250 req/วันของ free tier)
+///   - busy    = 503/504 (Google overload — retry แล้วยังไม่หาย)
+///   - network = Exception ตอน HTTP (ไม่มีเน็ต/timeout)
+///   - badResponse = 200 แต่ JSON parse ไม่ได้ / text ว่าง
 enum GeminiErrorCode { none, noApiKey, quota, busy, network, badResponse }
 
 class GeminiService {
+  /// อ่านหลังเรียก method ใดก็ได้ — บอกว่าเพิ่งเกิดอะไรขึ้น (.none = สำเร็จ)
   GeminiErrorCode lastError = GeminiErrorCode.none;
 
   String get apiKey {
@@ -21,7 +41,9 @@ class GeminiService {
     return key;
   }
 
-  /// POST with retry for transient 503/504. Returns the final response.
+  /// POST พร้อม retry สำหรับ 503/504 (Google ตอบช้า/overload ชั่วคราว)
+  /// ลอง 3 ครั้ง: ทันที → +2s → +5s
+  /// 503 มักจะหายเองใน 5-10 วินาที — retry ทำให้ user ไม่ต้องกดเอง
   Future<http.Response> _postWithRetry(
     Uri url,
     Map<String, String> headers,
@@ -42,6 +64,9 @@ class GeminiService {
     return response;
   }
 
+  /// วิเคราะห์รูปอาหาร → คืน JSON {food_name, calories_kcal, protein_g, fat_g, carbs_g, ...}
+  /// ใช้เมื่อ tflite ไม่รู้จักรูป (label ไม่อยู่ใน 37 ที่เทรนไว้)
+  /// คืน null ถ้า fail — เช็ค `lastError` เพื่อรู้สาเหตุ
   Future<Map<String, dynamic>?> detectFoodFromImage(
     Uint8List imageBytes,
   ) async {
@@ -147,6 +172,9 @@ class GeminiService {
     return GeminiErrorCode.badResponse;
   }
 
+  /// ขอข้อมูลโภชนาการจาก "ชื่ออาหาร" ภาษาไทย (ไม่ส่งรูป — ประหยัด token)
+  /// ใช้คู่กับ tflite: tflite ระบุชื่อ → call นี้เติมโภชนาการให้
+  /// คืน null ถ้า fail — เช็ค `lastError` เพื่อรู้สาเหตุ
   Future<Map<String, dynamic>?> getNutrition(String thaiFoodName) async {
     lastError = GeminiErrorCode.none;
 

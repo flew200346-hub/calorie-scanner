@@ -1,3 +1,20 @@
+// ============================================================================
+// tflite_service.dart — รัน on-device model (ที่เทรนเอง) จาก assets/best_float32.tflite
+// ----------------------------------------------------------------------------
+// หน้าที่:
+//   - load model + labels.txt (37 ชื่ออาหารไทย)
+//   - probe shape ของ input/output ตอน init → auto-detect format
+//   - รัน inference บนภาพแล้วคืน TfliteResult{label, confidence}
+//
+// รองรับ 3 รูปแบบ output:
+//   1) Classification        [1, C]            → softmax + argmax
+//   2) YOLO channel-first    [1, 4+C, N]       (YOLOv8 default)
+//   3) YOLO anchor-first     [1, N, 4+C]
+//
+// ใช้ที่: scan_page._runAnalysis (เป็น primary AI, fallback ไป Gemini ถ้าพลาด)
+// ถ้า init fail → service จะ disable ตัวเอง, แอปยังใช้งานได้ (Gemini ทำหมด)
+// ============================================================================
+
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +22,8 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
+/// Result เดียวที่ออกจาก model — label คือชื่อ raw จาก labels.txt
+/// (ไม่ใช่ภาษาไทย — แปลงผ่าน thai_food_names.dart ก่อนแสดง)
 class TfliteResult {
   final String label;
   final double confidence;
@@ -36,6 +55,8 @@ class TfliteService {
   bool get isReady =>
       _interpreter != null && _outputLayout != _OutputLayout.unknown;
 
+  /// โหลด model + labels พร้อม inspect shape ของ input/output
+  /// คืน true ถ้าพร้อมใช้งาน, false ถ้า shape ไม่ match → scan_page ข้ามไป Gemini
   Future<bool> init() async {
     try {
       final interpreter = await Interpreter.fromAsset(_modelAsset);
@@ -101,6 +122,10 @@ class TfliteService {
     }
   }
 
+  /// รัน inference บนรูป (jpg/png bytes)
+  /// - resize เป็นขนาดที่ model ต้องการ (ดูจาก input shape)
+  /// - normalize pixel เป็น [0, 1] (หาร 255)
+  /// - ถ้า confidence < minConfidence → คืน null → scan_page fallback ไป Gemini
   Future<TfliteResult?> classify(
     Uint8List imageBytes, {
     double minConfidence = 0.5,

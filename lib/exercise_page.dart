@@ -1,3 +1,11 @@
+// ============================================================================
+// exercise_page.dart — บันทึกการออกกำลังกาย (ยังเป็น MOCK)
+// ----------------------------------------------------------------------------
+// ⚠️ ฟีเจอร์ยังไม่เสร็จ: กด "บันทึก" แค่โชว์ SnackBar
+// ยังไม่บันทึกลง Firestore + ยังไม่หักจาก Calories Today ของ home
+// TODO: integrate กับ meals collection หรือ exercises collection แยก
+// ============================================================================
+
 import 'package:flutter/material.dart';
 
 class ExercisePage extends StatefulWidget {

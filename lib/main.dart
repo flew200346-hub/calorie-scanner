@@ -1,3 +1,12 @@
+// ============================================================================
+// main.dart — จุดเริ่มต้นของแอป (entry point)
+// ----------------------------------------------------------------------------
+// หน้าที่:
+//   1) bootstrap Flutter + dotenv (.env) + Firebase
+//   2) ประกอบ MaterialApp + ธีมที่ผูกกับช่วงเวลา (TimeThemeController)
+//   3) AuthGate ตัดสินใจว่า user login แล้วหรือยัง → LoginPage / AppShell
+// ============================================================================
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -11,12 +20,16 @@ import 'time_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // โหลดค่า env (GEMINI_API_KEY, CALORIE_NINJAS_API_KEY)
+  // ไฟล์ .env ต้องประกาศใน pubspec.yaml assets ด้วย
   await dotenv.load(fileName: '.env');
   debugPrint('dotenv loaded keys: ${dotenv.env.keys.toList()}');
   debugPrint(
     'dotenv key length: ${dotenv.get('GEMINI_API_KEY', fallback: '').trim().length}',
   );
 
+  // Firebase init — try/catch กัน "duplicate-app" ที่อาจเกิดจาก
+  // FirebaseInitProvider ของ Android SDK ที่ auto-init ก่อน main()
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -27,6 +40,12 @@ Future<void> main() async {
 
   runApp(const MyApp());
 }
+
+// ============================================================================
+// MyApp — root widget ที่ wrap MaterialApp
+// ใช้ TimeThemeController ฟังการเปลี่ยนช่วงเวลา (เช้า/เที่ยง/เย็น/กลางคืน)
+// ทุก 1 นาที → seed color + brightness ของธีมจะอัปเดตตามช่วงเวลาจริง
+// ============================================================================
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -207,6 +226,14 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
+// ============================================================================
+// AuthGate — ตัดสินใจหน้าแรกตามสถานะ Firebase Auth
+//   - กำลังเช็ค (waiting) → splash gradient cosmic + spinner
+//   - ยังไม่ login → LoginPage
+//   - login แล้ว → AppShell (มี bottom nav)
+// ฟัง authStateChanges() ตลอด → ถ้า logout จะเด้งกลับ LoginPage อัตโนมัติ
+// ============================================================================
+
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -216,6 +243,8 @@ class AuthGate extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
+          // splash ที่สีตรงกับ LaunchTheme ของ Android
+          // → ไม่มีจอกระพริบขาว→ดำ ตอนเปิดแอป
           return const Scaffold(
             body: DecoratedBox(
               decoration: BoxDecoration(

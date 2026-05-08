@@ -1,3 +1,14 @@
+// ============================================================================
+// register_page.dart — หน้าสมัคร (เปิดจาก login → กด "สมัคร")
+// ----------------------------------------------------------------------------
+// Validate: รหัสตรงกัน + ความยาว ≥ 6
+// Flow ตอน register สำเร็จ:
+//   1) FirebaseAuth.createUserWithEmailAndPassword
+//   2) สร้าง doc users/{uid} ด้วย {email, createdAt} (fire-and-forget)
+//      → profile_view_page เห็น email ทันทีตอน login ครั้งแรก
+//   3) Navigator.pop กลับ login → user login ปกติ
+// ============================================================================
+
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';

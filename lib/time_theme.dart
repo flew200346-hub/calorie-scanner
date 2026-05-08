@@ -1,3 +1,17 @@
+// ============================================================================
+// time_theme.dart — ธีมที่เปลี่ยนตามช่วงเวลาจริง (เช้า/เที่ยง/เย็น/กลางคืน)
+// ----------------------------------------------------------------------------
+// TimeThemeController = ChangeNotifier ที่ Timer.periodic(1 นาที)
+//   → ถ้า phase เปลี่ยน → notifyListeners() → MaterialApp rebuild
+//   → seed color + brightness เปลี่ยนตามช่วงเวลา
+//
+// TimeTheme.background() — ปัจจุบันไม่ถูกใช้แล้ว (CosmicBackground แทน)
+// แต่ TimeTheme.seed() ยังใช้ใน main.dart สร้าง ColorScheme
+//
+// Phase mapping:
+//   morning 6:00-10:59 / noon 11:00-15:59 / evening 16:00-18:59 / night ที่เหลือ
+// ============================================================================
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';

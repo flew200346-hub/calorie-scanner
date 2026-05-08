@@ -1,3 +1,19 @@
+// ============================================================================
+// home_page.dart — หน้าแรกหลัง login
+// ----------------------------------------------------------------------------
+// Sections (ตามลำดับบนหน้า):
+//   1) _buildGreeting        — "สวัสดี, ชื่อเล่น" (ดึง nickName จาก profile)
+//   2) _buildTodayCard       — Calories Today + progress bar (ใช้ TDEE จาก profile)
+//   3) _buildSearchCard      — กรอกชื่อแล้วไปหน้าสแกน
+//   4) _buildMealSection     — chip มื้อ + การ์ดมื้อ (สรุปแคลแต่ละมื้อวันนี้)
+//   5) _buildRecentFoodsSection — "อาหารที่เคยกิน" (unique, แตะ → re-add ทันที)
+//   6) _buildNutritionSection — Carbs/Fat/Protein bar เทียบเป้า
+//
+// ทุก section reactive — ฟัง stream Firestore (profile + meals วันนี้)
+// ค่า dailyCalorieGoal มาจาก UserProfile.dailyCalorieGoal (Mifflin × activity)
+// fallback 2000 ถ้า profile ยังไม่ครบ
+// ============================================================================
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +36,8 @@ const Map<String, Color> _mealColors = {
 
 Color _colorOf(String meal) => _mealColors[meal] ?? const Color(0xFF7BBFA1);
 
+/// รวมค่าโภชนาการของวันนี้ที่ user กินไปแล้ว
+/// คำนวณจาก _todayTotalsStream ที่ sum field ทุก meals doc ของวัน
 class _DailyTotals {
   final int calories;
   final int carbsG;
@@ -74,6 +92,8 @@ class _HomePageState extends State<HomePage> {
   DateTime _endOfDay(DateTime d) =>
       DateTime(d.year, d.month, d.day, 23, 59, 59, 999);
 
+  /// ฟัง meals วันนี้ของ user → sum cal/c/p/f real-time
+  /// ใช้ใน _buildTodayCard และ _buildNutritionSection
   Stream<_DailyTotals> _todayTotalsStream() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final now = DateTime.now();
@@ -105,6 +125,8 @@ class _HomePageState extends State<HomePage> {
 
   static double _num(dynamic v) => v is num ? v.toDouble() : 0;
 
+  /// ดึง meals 40 รายการล่าสุด → dedupe ตาม foodName → คืน 8 อาหารไม่ซ้ำ
+  /// ใช้ใน _buildRecentFoodsSection — แตะ tile = re-add (skip scan)
   Stream<List<Map<String, dynamic>>> _recentUniqueFoodsStream() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return _mealsCol()
@@ -727,6 +749,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// แตะการ์ดอาหารที่เคยกิน → เปิด FoodResultPage ด้วยข้อมูลเก่า
+  /// user กด "บันทึก" อีกครั้ง = บันทึกใหม่ทันที (ไม่ต้องสแกน, ไม่ใช้ AI)
   void _reuseFood(Map<String, dynamic> data) {
     double toD(dynamic v) => v is num ? v.toDouble() : 0.0;
 
